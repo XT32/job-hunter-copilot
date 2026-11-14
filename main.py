@@ -11,41 +11,27 @@ from playwright.sync_api import sync_playwright
 from src.browser import get_browser_context, human_delay
 from src.glints import GlintsHunter
 from src.storage import record_job, load_history
+from src.config import load_config, save_config
 
 console = Console()
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
-
-def load_config():
-    if not os.path.exists(CONFIG_FILE):
-        default_config = {
-            "keyword": "Python Developer",
-            "country": "ID",
-            "min_delay_sec": 2,
-            "max_delay_sec": 4,
-            "auto_skip_already_seen": True,
-            "slow_mo_ms": 150
-        }
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_config, f, indent=2)
-        return default_config
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_config(cfg):
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2)
 
 def print_header():
     cfg = load_config()
-    console.print("\n[bold white]loker-cli[/bold white] [dim]v1.0.0 — Tool Bantu Review & Lamar Pekerjaan[/dim]")
-    console.print(f"[dim]Kata Kunci Aktif: [cyan]{cfg.get('keyword')}[/cyan] | Platform: [cyan]Glints ID[/cyan][/dim]")
-    console.print("[dim]" + "─" * 60 + "[/dim]\n")
+    profile = cfg.get("profile", {})
+    keywords = ", ".join(profile.get("target_keywords", []))
+    exp = profile.get("experience_level", "all")
+    major = profile.get("field_or_major", "-")
+
+    console.print("\n[bold white]loker-cli[/bold white] [dim]v1.1.0 — Tool Bantu Review & Lamar Pekerjaan[/dim]")
+    console.print(f"[dim]Profil/Jurusan: [cyan]{major}[/cyan] | Level: [cyan]{exp}[/cyan] | Target: [cyan]{keywords}[/cyan][/dim]")
+    console.print("[dim]" + "─" * 65 + "[/dim]\n")
 
 def run_job_flow():
     cfg = load_config()
-    keyword = cfg.get("keyword", "Python Developer")
+    profile = cfg.get("profile", {})
+    target_kws = profile.get("target_keywords", ["Software Engineer"])
 
-    console.print(f"[*] Menyiapkan browser (kata kunci: '{keyword}')...")
+    console.print(f"[*] Menyiapkan browser untuk target: {', '.join(target_kws)}...")
 
     with sync_playwright() as p:
         context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
@@ -53,15 +39,15 @@ def run_job_flow():
         hunter = GlintsHunter(page, cfg)
 
         try:
-            console.print("[*] Mengambil daftar lowongan dari Glints...")
-            jobs = hunter.search_jobs(keyword)
+            console.print("[*] Mengambil daftar lowongan yang sesuai kriteria profil...")
+            jobs = hunter.search_jobs()
 
             if not jobs:
-                console.print("[yellow][-] Tidak ada lowongan baru yang ditemukan (atau sudah pernah ditinjau semua).[/yellow]")
+                console.print("[yellow][-] Tidak ada lowongan baru yang cocok dengan kriteria profil kamu saat ini.[/yellow]")
                 context.close()
                 return
 
-            console.print(f"[green][+] Ditemukan {len(jobs)} lowongan baru untuk ditinjau.[/green]\n")
+            console.print(f"[green][+] Ditemukan {len(jobs)} lowongan cocok yang siap ditinjau.[/green]\n")
 
             for idx, job in enumerate(jobs, start=1):
                 info_text = (
@@ -72,7 +58,6 @@ def run_job_flow():
                 )
                 console.print(Panel(info_text, title=f"Lowongan {idx}/{len(jobs)}", expand=False))
 
-                # Pilihan interaktif
                 choice = Prompt.ask(
                     "Pilihan ([bold green]y[/bold green]=Lamar, [bold yellow]s[/bold yellow]=Lewati, [bold cyan]o[/bold cyan]=Buka di browser, [bold red]q[/bold red]=Berhenti)",
                     choices=["y", "s", "o", "q"],
@@ -85,7 +70,7 @@ def run_job_flow():
                     break
                 
                 elif choice == "s":
-                    record_job(job["url"], job["title"], job["company"], status="skipped")
+                    record_job(job["url"], job["title"], job["company"], status="skipped", notes="Dilewati manual")
                     console.print("[dim][-] Dilewati.[/dim]\n")
                     continue
 
@@ -94,10 +79,9 @@ def run_job_flow():
                     page.goto(job["url"], wait_until="domcontentloaded")
                     second_choice = Prompt.ask("Lamar lowongan ini? (y/s)", choices=["y", "s"], default="y")
                     if second_choice == "s":
-                        record_job(job["url"], job["title"], job["company"], status="skipped")
+                        record_job(job["url"], job["title"], job["company"], status="skipped", notes="Dilewati setelah ditinjau")
                         continue
 
-                # Proses lamar
                 console.print("[*] Mengeksekusi tombol lamar...")
                 result = hunter.inspect_and_apply(job["url"])
 
@@ -140,15 +124,15 @@ def view_history():
     table.add_column("Posisi", style="white")
     table.add_column("Perusahaan", style="cyan")
     table.add_column("Status", style="yellow")
-    table.add_column("Tanggal", style="dim")
+    table.add_column("Keterangan", style="dim")
 
     count = 1
     for item in applied[-15:]:
-        table.add_row(str(count), item.get("title", "-"), item.get("company", "-"), "[green]Dilamar[/green]", item.get("timestamp", "-"))
+        table.add_row(str(count), item.get("title", "-"), item.get("company", "-"), "[green]Dilamar[/green]", item.get("notes", "-"))
         count += 1
 
     for item in skipped[-10:]:
-        table.add_row(str(count), item.get("title", "-"), item.get("company", "-"), "[red]Dilewati[/red]", item.get("timestamp", "-"))
+        table.add_row(str(count), item.get("title", "-"), item.get("company", "-"), "[red]Dilewati[/red]", item.get("notes", "-"))
         count += 1
 
     console.print(table)
@@ -156,19 +140,39 @@ def view_history():
 
 def settings_menu():
     cfg = load_config()
-    console.print(f"Kata Kunci saat ini: [cyan]{cfg.get('keyword')}[/cyan]")
-    if Confirm.ask("Ganti kata kunci pencarian?"):
-        new_kw = Prompt.ask("Masukkan kata kunci baru", default=cfg.get("keyword"))
-        cfg["keyword"] = new_kw
+    profile = cfg.get("profile", {})
+    
+    console.print("\n[bold]Pengaturan Profil Pencari Kerja:[/bold]")
+    console.print(f"1. Bidang/Jurusan      : [cyan]{profile.get('field_or_major', '-')}[/cyan]")
+    console.print(f"2. Kata Kunci Target   : [cyan]{', '.join(profile.get('target_keywords', []))}[/cyan]")
+    console.print(f"3. Level Pengalaman    : [cyan]{profile.get('experience_level', 'all')}[/cyan]")
+    console.print(f"4. Kata Kunci Terlarang: [cyan]{', '.join(profile.get('blacklist_keywords', [])[:4])}...[/cyan]")
+
+    if Confirm.ask("\nApakah kamu ingin mengubah profil/target loker?"):
+        major = Prompt.ask("Masukkan bidang/jurusan kamu", default=profile.get("field_or_major", "Teknik Informatika"))
+        keywords_input = Prompt.ask(
+            "Masukkan kata kunci target (pisahkan dengan koma)",
+            default=", ".join(profile.get("target_keywords", ["Staff"]))
+        )
+        exp = Prompt.ask(
+            "Level pengalaman kamu",
+            choices=["fresh_graduate", "junior", "mid", "senior", "all"],
+            default=profile.get("experience_level", "junior")
+        )
+
+        profile["field_or_major"] = major
+        profile["target_keywords"] = [k.strip() for k in keywords_input.split(",") if k.strip()]
+        profile["experience_level"] = exp
+        cfg["profile"] = profile
         save_config(cfg)
-        console.print("[green][OK] Kata kunci diperbarui.[/green]\n")
+        console.print("[green][OK] Profil berhasil diperbarui.[/green]\n")
 
 def main():
     while True:
         print_header()
         console.print("[1] Jalankan Review & Lamar (Glints)")
         console.print("[2] Cek Riwayat Lamaran")
-        console.print("[3] Ganti Kata Kunci / Pengaturan")
+        console.print("[3] Atur Profil & Kata Kunci Jurusan")
         console.print("[4] Keluar")
         
         choice = Prompt.ask("\nPilih menu", choices=["1", "2", "3", "4"], default="1")

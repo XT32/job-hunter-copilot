@@ -1,12 +1,14 @@
 import time
 from urllib.parse import quote
 from src.browser import human_delay
-from src.storage import is_job_recorded
+from src.storage import is_job_recorded, record_job
+from src.matcher import JobMatcher
 
 class GlintsHunter:
     def __init__(self, page, config):
         self.page = page
         self.config = config
+        self.matcher = JobMatcher(config.get("profile", {}))
 
     def check_login_status(self):
         """Memeriksa apakah user sudah login ke Glints"""
@@ -18,9 +20,15 @@ class GlintsHunter:
         except Exception:
             return True
 
-    def search_jobs(self, keyword):
-        """Mencari daftar loker di Glints berdasarkan kata kunci"""
-        encoded_kw = quote(keyword)
+    def search_jobs(self, keywords=None):
+        """Mencari daftar loker di Glints berdasarkan kata kunci profil"""
+        if not keywords:
+            profile = self.config.get("profile", {})
+            keywords = profile.get("target_keywords", ["Software Engineer"])
+
+        # Gunakan keyword utama untuk query URL
+        main_query = keywords[0] if isinstance(keywords, list) and keywords else str(keywords)
+        encoded_kw = quote(main_query)
         url = f"https://glints.com/id/opportunities/jobs/explore?keyword={encoded_kw}&country=ID"
         
         self.page.goto(url, wait_until="domcontentloaded", timeout=30000)
@@ -67,6 +75,13 @@ class GlintsHunter:
                     if any(c in line for c in ["IDR", "Rp", "Gaji", "Month", "Bulan"]):
                         salary = line.strip()
                         break
+
+                # Evaluasi kecocokan dengan profil pengguna (Jurusan, Pengalaman, Blacklist)
+                is_match, reason = self.matcher.evaluate(title, company)
+                if not is_match:
+                    # Otomatis lewati lowongan yang tidak relevan (misal level terlalu tinggi atau blacklist)
+                    record_job(clean_url, title, company, status="skipped", notes=f"Filter profil: {reason}")
+                    continue
 
                 jobs.append({
                     "title": title,

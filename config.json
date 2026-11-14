@@ -1,8 +1,29 @@
 {
-  "keyword": "Python Developer",
+  "profile": {
+    "field_or_major": "Teknik Informatika",
+    "target_keywords": [
+      "Backend Developer",
+      "Python",
+      "Software Engineer"
+    ],
+    "experience_level": "junior",
+    "work_type": "all",
+    "preferred_locations": [],
+    "blacklist_keywords": [
+      "Senior",
+      "Lead",
+      "Manager",
+      "Head of",
+      "Director",
+      "SPG",
+      "Sales Lapangan",
+      "Asuransi",
+      "Canvasser"
+    ]
+  },
   "country": "ID",
   "min_delay_sec": 2,
-  "max_delay_sec": 5,
+  "max_delay_sec": 4,
   "auto_skip_already_seen": true,
-  "slow_mo_ms": 300
+  "slow_mo_ms": 150
 }
