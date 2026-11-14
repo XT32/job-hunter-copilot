@@ -14,9 +14,14 @@ __pycache__/
 user_browser_data/
 *.session
 
-# Local User Data & History
+# Attachments / Personal CVs (Mencegah data pribadi ter-commit ke publik)
+attachments/*
+!attachments/.gitkeep
+
+# Local User Data, History & Backups
 data/history.json
 data/*.csv
+data/backup_*.json
 *.log
 
 # Environment variables

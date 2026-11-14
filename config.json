@@ -1,14 +1,17 @@
 {
   "profile": {
-    "field_or_major": "Teknik Informatika",
+    "field_or_major": "Akuntansi",
     "target_keywords": [
-      "Backend Developer",
-      "Python",
-      "Software Engineer"
+      "Staff Akuntansi",
+      "Finance Staff",
+      "Tax Officer"
     ],
-    "experience_level": "junior",
+    "experience_level": "fresh_graduate",
     "work_type": "all",
-    "preferred_locations": [],
+    "preferred_locations": [
+      "Jakarta",
+      "Remote"
+    ],
     "blacklist_keywords": [
       "Senior",
       "Lead",
@@ -19,7 +22,30 @@
       "Sales Lapangan",
       "Asuransi",
       "Canvasser"
-    ]
+    ],
+    "applicant_name": "Nama Lengkap Kamu",
+    "contact_info": "+62 812-xxxx-xxxx | linkedin.com/in/username"
+  },
+  "screening_defaults": {
+    "expected_salary": "6000000",
+    "notice_period": "Immediately",
+    "years_of_experience": "1",
+    "willing_to_wfo": true,
+    "willing_to_relocate": true,
+    "domicile": "Jakarta"
+  },
+  "smtp": {
+    "host": "smtp.gmail.com",
+    "port": 465,
+    "email": "",
+    "password": "",
+    "sender_name": "",
+    "cv_path": "attachments/CV.pdf"
+  },
+  "telegram": {
+    "bot_token": "",
+    "chat_id": "",
+    "enabled": false
   },
   "country": "ID",
   "min_delay_sec": 2,

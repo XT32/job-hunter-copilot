@@ -68,11 +68,18 @@ Unduh seluruh konfigurasi dan riwayat lamaran dalam format JSON dengan tombol **
 
 ---
 
-## 🛡️ Karakteristik Keamanan & Resource
+## 🛡️ Karakteristik Keamanan, Privasi & Resource
 
+- **Privasi CV 100% Lokal:** File CV (`attachments/`), riwayat lamaran (`data/`), dan konfigurasi disimpan sepenuhnya di komputer kamu. Direktori `attachments/` dilindungi `.gitignore` sehingga tidak akan pernah terunggah ke repositori GitHub.
+- **Bebas Telemetri & API Pihak Ketiga:** Analisis kecocokan ATS, ekstraksi teks, dan penulisan cover letter dihitung secara lokal tanpa mengirim data pribadi ke server eksternal atau AI cloud berbayar.
 - **Konservasi Memori (Low RAM):** Menggunakan flag Chromium khusus (`--disable-gpu`, `--renderer-process-limit=2`, dll) agar tetap lancar di perangkat dengan RAM 4GB.
 - **Sesi Lokal Aman:** Sesi login disimpan di direktori lokal (`user_browser_data/`) dan otomatis diabaikan oleh Git, sehingga data kredensial tidak pernah keluar dari komputer pengguna.
 - **Human-in-the-loop:** Pengguna memegang kendali penuh atas keputusan melamar atau melewati setiap lowongan.
+
+---
+
+## 🤝 Berkontribusi
+Tertarik menambahkan dukungan portal lowongan kerja baru atau memperbaiki bug? Silakan baca panduan lengkap di [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

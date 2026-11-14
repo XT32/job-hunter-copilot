@@ -21,7 +21,12 @@ from src.cv_analyzer import extract_text_from_pdf, calculate_ats_match
 from src.scheduler import AutoHuntScheduler
 
 app = Flask(__name__, template_folder="templates")
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # Maksimal 10 MB untuk upload CV
 playwright_lock = threading.Lock()
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    return jsonify({"success": False, "error": "Ukuran file terlalu besar! Maksimal 10 MB."}), 413
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "attachments")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)

@@ -265,4 +265,8 @@ def main():
             sys.exit(0)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[dim]Dibatalkan oleh pengguna. Sampai jumpa.[/dim]\n")
+        sys.exit(0)
