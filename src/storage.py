@@ -1,8 +1,10 @@
+import csv
 import json
 import os
 import time
 
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "history.json")
+DEFAULT_CSV_EXPORT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "riwayat_lamaran.csv")
 
 def _ensure_history_file():
     os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
@@ -39,9 +41,39 @@ def record_job(job_url, title, company, status="applied", notes=""):
     if category not in hist:
         hist[category] = []
         
-    # Prevent duplicate records
     hist[category] = [item for item in hist[category] if item.get("url") != job_url]
     hist[category].append(entry)
     
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(hist, f, indent=2, ensure_ascii=False)
+
+def export_history_to_csv(export_path=DEFAULT_CSV_EXPORT) -> str:
+    """Mengekspor seluruh riwayat (dilamar dan dilewati) ke format CSV"""
+    hist = load_history()
+    os.makedirs(os.path.dirname(export_path), exist_ok=True)
+
+    with open(export_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Status", "Posisi", "Perusahaan", "Waktu", "Tautan Loker", "Catatan"])
+        
+        for item in hist.get("applied", []):
+            writer.writerow([
+                "Dilamar",
+                item.get("title", ""),
+                item.get("company", ""),
+                item.get("timestamp", ""),
+                item.get("url", ""),
+                item.get("notes", "")
+            ])
+
+        for item in hist.get("skipped", []):
+            writer.writerow([
+                "Dilewati",
+                item.get("title", ""),
+                item.get("company", ""),
+                item.get("timestamp", ""),
+                item.get("url", ""),
+                item.get("notes", "")
+            ])
+
+    return export_path

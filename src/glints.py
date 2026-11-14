@@ -1,16 +1,16 @@
 import time
 from urllib.parse import quote
+from src.base_hunter import BaseJobHunter
 from src.browser import human_delay
 from src.storage import is_job_recorded, record_job
 from src.matcher import JobMatcher
 
-class GlintsHunter:
+class GlintsHunter(BaseJobHunter):
     def __init__(self, page, config):
-        self.page = page
-        self.config = config
+        super().__init__(page, config)
         self.matcher = JobMatcher(config.get("profile", {}))
 
-    def check_login_status(self):
+    def check_login_status(self) -> bool:
         """Memeriksa apakah user sudah login ke Glints"""
         try:
             login_btn = self.page.locator("a:has-text('Masuk'), button:has-text('Masuk'), a:has-text('Sign In')").first
@@ -20,19 +20,22 @@ class GlintsHunter:
         except Exception:
             return True
 
-    def search_jobs(self, keywords=None):
+    def search_jobs(self, keywords=None) -> list:
         """Mencari daftar loker di Glints berdasarkan kata kunci profil"""
         if not keywords:
             profile = self.config.get("profile", {})
             keywords = profile.get("target_keywords", ["Software Engineer"])
 
-        # Gunakan keyword utama untuk query URL
         main_query = keywords[0] if isinstance(keywords, list) and keywords else str(keywords)
         encoded_kw = quote(main_query)
         url = f"https://glints.com/id/opportunities/jobs/explore?keyword={encoded_kw}&country=ID"
         
-        self.page.goto(url, wait_until="domcontentloaded", timeout=30000)
-        human_delay(2, 3)
+        try:
+            self.page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            human_delay(2, 3)
+        except Exception as e:
+            print(f"[!] Gagal memuat halaman Glints: {e}")
+            return []
 
         if not self.check_login_status():
             print("\n[!] PERINGATAN: Sesi login Glints belum aktif.")
@@ -79,7 +82,6 @@ class GlintsHunter:
                 # Evaluasi kecocokan dengan profil pengguna (Jurusan, Pengalaman, Blacklist)
                 is_match, reason = self.matcher.evaluate(title, company)
                 if not is_match:
-                    # Otomatis lewati lowongan yang tidak relevan (misal level terlalu tinggi atau blacklist)
                     record_job(clean_url, title, company, status="skipped", notes=f"Filter profil: {reason}")
                     continue
 
@@ -94,10 +96,13 @@ class GlintsHunter:
 
         return jobs
 
-    def inspect_and_apply(self, job_url):
+    def inspect_and_apply(self, job_url: str) -> dict:
         """Membuka halaman detail loker dan mengeksekusi lamaran dengan validasi keamanan"""
-        self.page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
-        human_delay(1.5, 2.5)
+        try:
+            self.page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
+            human_delay(1.5, 2.5)
+        except Exception as e:
+            return {"status": "error", "message": f"Timeout membuka URL: {e}"}
 
         # 1. Cek apakah sudah pernah dilamar
         already_applied = self.page.locator("text='Sudah Dilamar', text='Terkirim', text='Applied'").first
