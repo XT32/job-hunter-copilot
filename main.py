@@ -11,6 +11,7 @@ from src.browser import get_browser_context, human_delay
 from src.glints import GlintsHunter
 from src.jobstreet import JobstreetHunter
 from src.maganghub import MagangHubHunter
+from src.dealls import DeallsHunter
 from src.storage import record_job, load_history, update_job_status, export_history_to_csv
 from src.config import load_config, save_config
 from src.cover_letter import generate_cover_letter
@@ -43,9 +44,9 @@ def print_header():
     exp = profile.get("experience_level", "all")
     major = profile.get("field_or_major", "-")
 
-    console.print("\n[bold white]loker-cli[/bold white] [dim]v1.3.0 — Multi-Platform Job & Internship Assistant[/dim]")
+    console.print("\n[bold white]loker-cli[/bold white] [dim]v1.4.0 — Multi-Platform Career & Internship Assistant[/dim]")
     console.print(f"[dim]Profil: [cyan]{major}[/cyan] ({exp}) | Target: [cyan]{keywords}[/cyan][/dim]")
-    console.print("[dim]" + "─" * 70 + "[/dim]\n")
+    console.print("[dim]" + "─" * 72 + "[/dim]\n")
 
 def run_hunter_session(HunterClass, platform_name):
     cfg = load_config()
@@ -80,7 +81,7 @@ def run_hunter_session(HunterClass, platform_name):
                 console.print(Panel(info_text, title=f"Lowongan {idx}/{len(jobs)} ({platform_name})", expand=False))
 
                 choice = Prompt.ask(
-                    "Pilihan ([bold green]y[/bold green]=Lamar, [bold yellow]s[/bold yellow]=Lewati, [bold cyan]o[/bold cyan]=Buka detail, [bold magenta]c[/bold magenta]=Buat Cover Letter, [bold red]q[/bold red]=Berhenti)",
+                    "Pilihan ([bold green]y[/bold green]=Lamar, [bold yellow]s[/bold yellow]=Lewati, [bold cyan]o[/bold cyan]=Buka detail, [bold magenta]c[/bold magenta]=Cover Letter, [bold red]q[/bold red]=Berhenti)",
                     choices=["y", "s", "o", "c", "q"],
                     default="y",
                     show_choices=False
@@ -94,8 +95,7 @@ def run_hunter_session(HunterClass, platform_name):
                     letter = generate_cover_letter(job["title"], job["company"], profile, preset="formal")
                     console.print("\n[bold cyan]Surat Lamaran (Cover Letter) Otomatis:[/bold cyan]")
                     console.print(Panel(letter, expand=False))
-                    # Tanyakan lagi mau dilamar atau tidak
-                    continue_choice = Prompt.ask("Ingin langsung melamar di browser sekarang? (y/s)", choices=["y", "s"], default="y")
+                    continue_choice = Prompt.ask("Ingin langsung melamar sekarang? (y/s)", choices=["y", "s"], default="y")
                     if continue_choice == "s":
                         record_job(job["url"], job["title"], job["company"], status="skipped", notes="Dilewati setelah cek cover letter")
                         continue
@@ -187,7 +187,7 @@ def kanban_menu():
     if Confirm.ask("\nPerbarui status salah satu lamaran?"):
         target_url = Prompt.ask("Masukkan URL / Email lamaran yang ingin diubah")
         new_stat = Prompt.ask("Status baru", choices=["applied", "interview", "offering", "rejected"])
-        notes = Prompt.ask("Catatan tambahan (misal: Interview HR tgl 20 Nov via Zoom)")
+        notes = Prompt.ask("Catatan perkembangan")
         if update_job_status(target_url, new_stat, notes):
             console.print("[green][OK] Status berhasil diperbarui![/green]\n")
         else:
@@ -207,10 +207,9 @@ def settings_menu():
     console.print(f"2. Kata Kunci Target   : [cyan]{', '.join(profile.get('target_keywords', []))}[/cyan]")
     console.print(f"3. Level Pengalaman    : [cyan]{profile.get('experience_level', 'all')}[/cyan]")
     console.print(f"4. Ekspektasi Gaji     : [cyan]Rp {screening.get('expected_salary', '6000000')}[/cyan]")
-    console.print(f"5. Notice Period       : [cyan]{screening.get('notice_period', 'Immediately')}[/cyan]")
 
-    if Confirm.ask("\nApakah kamu ingin mengubah pengaturan profil ini?"):
-        major = Prompt.ask("Masukkan bidang/jurusan kamu", default=profile.get("field_or_major", "Akuntansi"))
+    if Confirm.ask("\nApakah kamu ingin mengubah data profil ini?"):
+        major = Prompt.ask("Bidang/jurusan kamu", default=profile.get("field_or_major", "Akuntansi"))
         keywords_input = Prompt.ask("Kata kunci target (pisahkan koma)", default=", ".join(profile.get("target_keywords", ["Staff"])))
         exp = Prompt.ask("Level pengalaman", choices=["fresh_graduate", "junior", "mid", "senior", "all"], default=profile.get("experience_level", "junior"))
         salary = Prompt.ask("Ekspektasi gaji default (angka)", default=str(screening.get("expected_salary", "6000000")))
@@ -223,7 +222,7 @@ def settings_menu():
         cfg["profile"] = profile
         cfg["screening_defaults"] = screening
         save_config(cfg)
-        console.print("[green][OK] Pengaturan berhasil diperbarui.[/green]\n")
+        console.print("[green][OK] Pengaturan diperbarui.[/green]\n")
 
 def main():
     check_first_run_onboarding()
@@ -232,12 +231,13 @@ def main():
         console.print("[1] Review & Lamar di [bold cyan]Glints Indonesia[/bold cyan]")
         console.print("[2] Review & Lamar di [bold magenta]JobStreet Indonesia (SEEK)[/bold magenta]")
         console.print("[3] Cari Program Magang di [bold green]MagangHub Kemnaker[/bold green]")
-        console.print("[4] Kirim Lamaran Langsung ke Email HRD (Cold Email)")
-        console.print("[5] Pelacak Lamaran (Pipeline Status & Ekspor CSV)")
-        console.print("[6] Atur Profil, Kata Kunci & Gaji Default")
-        console.print("[7] Keluar")
+        console.print("[4] Review & Lamar di [bold yellow]Dealls Jobs Indonesia[/bold yellow]")
+        console.print("[5] Kirim Lamaran Langsung ke Email HRD (Cold Email)")
+        console.print("[6] Pelacak Lamaran (Pipeline Status & Ekspor CSV)")
+        console.print("[7] Atur Profil & Gaji Default")
+        console.print("[8] Keluar")
         
-        choice = Prompt.ask("\nPilih menu", choices=["1", "2", "3", "4", "5", "6", "7"], default="1")
+        choice = Prompt.ask("\nPilih menu", choices=["1", "2", "3", "4", "5", "6", "7", "8"], default="1")
         
         if choice == "1":
             run_hunter_session(GlintsHunter, "Glints")
@@ -249,15 +249,18 @@ def main():
             run_hunter_session(MagangHubHunter, "MagangHub")
             Prompt.ask("\nTekan ENTER untuk kembali")
         elif choice == "4":
-            direct_email_menu()
+            run_hunter_session(DeallsHunter, "Dealls")
             Prompt.ask("\nTekan ENTER untuk kembali")
         elif choice == "5":
-            kanban_menu()
+            direct_email_menu()
             Prompt.ask("\nTekan ENTER untuk kembali")
         elif choice == "6":
-            settings_menu()
+            kanban_menu()
             Prompt.ask("\nTekan ENTER untuk kembali")
         elif choice == "7":
+            settings_menu()
+            Prompt.ask("\nTekan ENTER untuk kembali")
+        elif choice == "8":
             console.print("[dim]Sampai jumpa.[/dim]\n")
             sys.exit(0)
 

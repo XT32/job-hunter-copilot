@@ -3,9 +3,9 @@
 [![Unit Tests](https://github.com/XT32/job-hunter-copilot/actions/workflows/test.yml/badge.svg)](https://github.com/XT32/job-hunter-copilot/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Platform asisten pencari kerja & pemagangan multi-portal (**Glints**, **JobStreet Indonesia**, dan **MagangHub Kemnaker**) secara semi-otomatis (*human-in-the-loop*).
+Platform asisten pencari kerja & pemagangan multi-portal (**Glints**, **JobStreet Indonesia**, **MagangHub Kemnaker**, dan **Dealls Jobs**) secara semi-otomatis (*human-in-the-loop*).
 
-Tersedia dalam 2 mode: **Web Dashboard Visual (untuk pengguna awam/umum)** dan **Terminal CLI (untuk pengguna cepat)**.
+Tersedia dalam 2 mode: **Web Dashboard Visual (untuk pengguna umum/awam)** dan **Terminal CLI (untuk pengguna cepat)**.
 
 ---
 
@@ -26,23 +26,28 @@ Bagi kamu yang **tidak paham Git** atau **tidak punya Git di komputer**:
 
 ## 🌟 Fitur & Kemampuan Lengkap
 
-### 1. Multi-Platform Support
-- **Glints Indonesia** (Lamar Cepat & lowongan teknologi/startup/korporat).
+### 1. Multi-Platform Support (4 Portal Terbesar di Indonesia)
+- **Glints Indonesia** (Lamar Cepat lowongan teknologi, startup & korporat).
 - **JobStreet Indonesia (SEEK)** (Menggunakan selector resmi data-automation SEEK).
 - **MagangHub Kemnaker** (Program Pemagangan Nasional resmi Kementerian Ketenagakerjaan RI).
+- **Dealls Jobs Indonesia** (Pilihan posisi full-time, part-time & internship terkemuka).
 
-### 2. Auto-Fill Pertanyaan Screening (`src/screener.py`)
+### 2. Pengecekan Skor Kecocokan ATS (`src/cv_analyzer.py`)
+- Unggah file PDF CV kamu langsung di Web Dashboard.
+- Sistem mengekstrak keahlian dan mengalkulasi persentase kecocokan ATS (Applicant Tracking System) secara langsung pada setiap kartu lowongan yang ditemukan.
+
+### 3. Auto-Fill Pertanyaan Screening (`src/screener.py`)
 Mendeteksi dan mengisi otomatis kuesioner umum saat pop-up lamaran muncul:
 - Ekspektasi gaji default.
 - Notice period.
 - Pengalaman kerja (tahun).
 - Kota domisili & kesediaan WFO.
 
-### 3. Generator Cover Letter Instan (`src/cover_letter.py`)
+### 4. Generator Cover Letter Instan (`src/cover_letter.py`)
 Menghasilkan surat lamaran kerja yang dipersonalisasi sesuai nama pelamar, nama perusahaan tujuan, dan posisi:
 - Pilihan gaya: **Formal Korporat**, **Fresh Graduate**, dan **Program Pemagangan**.
 
-### 4. Papan Pelacak Status Lamaran (Kanban Pipeline)
+### 5. Papan Pelacak Status Lamaran (Kanban Pipeline)
 Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
 - 📨 **Terkirim (Applied)**
 - 💬 **Panggilan Interview**
@@ -50,13 +55,16 @@ Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
 - ❌ **Ditolak / Gugur**
 Lengkap dengan fitur **Ekspor CSV/Excel** dengan 1 klik.
 
-### 5. Modul Direct Cold-Email (`src/email_sender.py`)
+### 6. Modul Direct Cold-Email (`src/email_sender.py`)
 Untuk lowongan yang tidak memiliki tombol apply di web (misal di Twitter atau LinkedIn yang meminta kirim email langsung ke HRD):
 - Kirim email profesional via SMTP (Gmail App Password).
 - Lampirkan file PDF CV secara otomatis.
 
-### 6. Notifikasi Telegram Bot Gratis (`src/notifier.py`)
+### 7. Notifikasi Telegram Bot Gratis (`src/notifier.py`)
 Menerima pemberitahuan langsung di aplikasi Telegram pribadi saat bot menemukan lowongan yang cocok dengan jurusan/profil kamu.
+
+### 8. Cadangan Data (Backup & Restore)
+Unduh seluruh konfigurasi dan riwayat lamaran dalam format JSON dengan tombol **Backup** di pojok kanan atas dashboard.
 
 ---
 
@@ -79,7 +87,7 @@ Menerima pemberitahuan langsung di aplikasi Telegram pribadi saat bot menemukan 
 
 ## Menjalankan Unit Tests
 
-Repositori ini dilengkapi rangkaian 16 pengujian otomatis tanpa dependensi eksternal:
+Repositori ini dilengkapi rangkaian 21 pengujian otomatis tanpa dependensi eksternal:
 
 ```bash
 python -m unittest discover tests -v

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>loker-cli Dashboard — Asisten Karir & Magang</title>
+  <title>loker-cli Dashboard — Platform Karir & Magang</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -21,9 +21,9 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: var(--bg); color: var(--text); line-height: 1.5; padding: 20px; }
-    .container { max-width: 1100px; margin: 0 auto; }
+    .container { max-width: 1150px; margin: 0 auto; }
     
-    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 25px; }
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
     .brand { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
     .tagline { font-size: 0.85rem; color: var(--text-muted); }
 
@@ -40,7 +40,7 @@
     .form-group { margin-bottom: 15px; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
-    input[type="text"], input[type="email"], input[type="password"], select, textarea {
+    input[type="text"], input[type="email"], input[type="password"], select, textarea, input[type="file"] {
       width: 100%; padding: 10px 14px; background: #0b1120; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem;
     }
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
@@ -59,17 +59,18 @@
     .job-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .job-title { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; }
     .job-company { font-size: 0.9rem; color: var(--primary); }
-    .job-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .job-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: #0f172a; border: 1px solid var(--border); color: var(--text-muted); }
     .badge-salary { color: var(--success); border-color: rgba(34, 197, 94, 0.3); }
+    .badge-ats { background: rgba(168, 85, 247, 0.15); color: #c084fc; border-color: rgba(168, 85, 247, 0.4); font-weight: 700; }
 
     .job-actions { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
 
     /* KANBAN BOARD */
-    .kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-top: 15px; }
-    .kanban-col { background: #162032; border: 1px solid var(--border); border-radius: 10px; padding: 15px; min-height: 380px; display: flex; flex-direction: column; }
+    .kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px; }
+    .kanban-col { background: #162032; border: 1px solid var(--border); border-radius: 10px; padding: 15px; min-height: 400px; display: flex; flex-direction: column; }
     .kanban-header { font-weight: 700; font-size: 0.95rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
-    .kanban-items { display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; max-height: 480px; }
+    .kanban-items { display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; max-height: 520px; }
     .kanban-card { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 0.85rem; }
     .kanban-card-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
     .kanban-card-company { color: var(--primary); font-size: 0.8rem; margin-bottom: 6px; }
@@ -89,18 +90,20 @@
     <header>
       <div>
         <div class="brand">loker-cli Dashboard</div>
-        <div class="tagline">Asisten Karir & Magang Multi-Platform (Glints, JobStreet, MagangHub Kemnaker)</div>
+        <div class="tagline">Platform Karir & Magang (Glints, JobStreet, MagangHub, Dealls)</div>
       </div>
-      <div>
+      <div style="display: flex; gap: 10px; align-items: center;">
         <span class="badge" id="activeProfileBadge">Profil: Memuat...</span>
+        <a href="/api/backup" class="btn btn-secondary btn-sm" title="Unduh cadangan data JSON">💾 Backup</a>
       </div>
     </header>
 
     <div class="nav-tabs">
       <button class="tab-btn active" onclick="switchTab('huntTab')">🔍 Berburu Loker & Magang</button>
+      <button class="tab-btn" onclick="switchTab('cvTab')">📄 Kelola CV & Skor ATS</button>
       <button class="tab-btn" onclick="switchTab('kanbanTab')">📋 Papan Pelacak (Kanban)</button>
       <button class="tab-btn" onclick="switchTab('emailTab')">✉️ Cold Email HRD</button>
-      <button class="tab-btn" onclick="switchTab('profileTab')">⚙️ Pengaturan & Screening</button>
+      <button class="tab-btn" onclick="switchTab('profileTab')">⚙️ Pengaturan & Auto-Screening</button>
     </div>
 
     <!-- TAB 1: HUNT & REVIEW -->
@@ -108,12 +111,13 @@
       <div class="card">
         <div class="card-title">Pindai Lowongan / Program Magang</div>
         <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
-          <div class="form-group" style="flex: 1; min-width: 240px; margin-bottom: 0;">
+          <div class="form-group" style="flex: 1; min-width: 250px; margin-bottom: 0;">
             <label>Pilih Platform Sasaran</label>
             <select id="platformSelect">
               <option value="glints">Glints Indonesia</option>
               <option value="jobstreet">JobStreet Indonesia (SEEK)</option>
               <option value="maganghub">MagangHub Kemnaker (Program Magang Nasional)</option>
+              <option value="dealls">Dealls Jobs Indonesia</option>
             </select>
           </div>
           <button class="btn btn-primary" id="btnScan" onclick="startScan()">
@@ -127,7 +131,23 @@
       <div id="jobsContainer" class="job-list"></div>
     </div>
 
-    <!-- TAB 2: KANBAN TRACKER -->
+    <!-- TAB 2: CV & ATS ANALYZER -->
+    <div id="cvTab" class="tab-content">
+      <div class="card">
+        <div class="card-title">Unggah CV & Pengecekan Skor Kecocokan ATS</div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+          Unggah file PDF CV kamu di sini. Sistem akan otomatis menganalisis keahlian dan mengalkulasi persentase kecocokan ATS pada setiap lowongan yang ditemukan.
+        </p>
+        <div class="form-group">
+          <label>Pilih File PDF CV Kamu</label>
+          <input type="file" id="cvFileInput" accept=".pdf">
+        </div>
+        <button class="btn btn-primary" onclick="uploadCV()">📤 Unggah & Analisis CV</button>
+        <div id="cvUploadStatus" style="margin-top: 15px; font-size: 0.9rem;"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: KANBAN TRACKER -->
     <div id="kanbanTab" class="tab-content">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <div class="card-title" style="margin-bottom: 0;">Papan Pelacak Status Lamaran (Pipeline)</div>
@@ -169,7 +189,7 @@
       </div>
     </div>
 
-    <!-- TAB 3: DIRECT COLD EMAIL -->
+    <!-- TAB 4: DIRECT COLD EMAIL -->
     <div id="emailTab" class="tab-content">
       <div class="card">
         <div class="card-title">Kirim Lamaran Langsung ke Email HRD (Cold Email)</div>
@@ -189,11 +209,11 @@
         </div>
         <div class="form-group">
           <label>Subjek Email</label>
-          <input type="text" id="emailSubject" placeholder="Subjek email otomatis akan dibuatkan">
+          <input type="text" id="emailSubject" placeholder="Subjek email otomatis">
         </div>
         <div class="form-group">
           <label>Isi Surat Lamaran (Body Email)</label>
-          <textarea id="emailBody" rows="8" placeholder="Tulis isi email atau klik 'Buat Template' di bawah..."></textarea>
+          <textarea id="emailBody" rows="8"></textarea>
         </div>
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-secondary" onclick="generateEmailDraft()">📄 Buat Draft Otomatis</button>
@@ -203,7 +223,7 @@
       </div>
     </div>
 
-    <!-- TAB 4: PROFILE & SETTINGS -->
+    <!-- TAB 5: PROFILE & SETTINGS -->
     <div id="profileTab" class="tab-content">
       <div class="card">
         <div class="card-title">1. Profil Pencari Kerja & Jurusan</div>
@@ -219,11 +239,11 @@
         </div>
         <div class="form-group">
           <label>Bidang / Jurusan Kamu</label>
-          <input type="text" id="cfgMajor" placeholder="Contoh: Akuntansi, Desain Grafis, Teknik Informatika">
+          <input type="text" id="cfgMajor" placeholder="Contoh: Akuntansi, Desain Grafis, IT">
         </div>
         <div class="form-group">
           <label>Kata Kunci Posisi yang Dicari (Pisahkan koma)</label>
-          <input type="text" id="cfgKeywords" placeholder="Contoh: Staff Akuntansi, Finance Staff, Tax Officer">
+          <input type="text" id="cfgKeywords" placeholder="Contoh: Staff Akuntansi, Finance Staff">
         </div>
         <div class="form-group">
           <label>Tingkat Pengalaman</label>
@@ -237,7 +257,7 @@
         </div>
         <div class="form-group">
           <label>Kata Kunci Terlarang (Blacklist — Pisahkan koma)</label>
-          <input type="text" id="cfgBlacklist" placeholder="Contoh: SPG, Sales Lapangan, Canvasser, Asuransi">
+          <input type="text" id="cfgBlacklist" placeholder="SPG, Sales Lapangan, Canvasser, Asuransi">
         </div>
       </div>
 
@@ -250,7 +270,7 @@
           </div>
           <div class="form-group">
             <label>Notice Period</label>
-            <input type="text" id="cfgNotice" placeholder="Immediately / 1 Bulan">
+            <input type="text" id="cfgNotice" placeholder="Immediately">
           </div>
         </div>
         <div class="form-row">
@@ -266,21 +286,21 @@
       </div>
 
       <div class="card">
-        <div class="card-title">3. Notifikasi Telegram Bot (Opsional & Gratis)</div>
+        <div class="card-title">3. Notifikasi Telegram Bot (Opsional)</div>
         <div class="form-row">
           <div class="form-group">
             <label>Bot Token Telegram</label>
-            <input type="text" id="cfgTgToken" placeholder="Contoh: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+            <input type="text" id="cfgTgToken">
           </div>
           <div class="form-group">
-            <label>Chat ID Telegram Kamu</label>
-            <input type="text" id="cfgTgChat" placeholder="Contoh: 987654321">
+            <label>Chat ID Telegram</label>
+            <input type="text" id="cfgTgChat">
           </div>
         </div>
         <div class="form-group">
           <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
             <input type="checkbox" id="cfgTgEnabled" style="width: auto;">
-            Aktifkan notifikasi otomatis ke Telegram saat lowongan cocok ditemukan
+            Kirimkan notifikasi langsung ke Telegram saya saat lowongan cocok ditemukan
           </label>
         </div>
       </div>
@@ -396,6 +416,35 @@
       }
     }
 
+    async function uploadCV() {
+      const fileInput = document.getElementById('cvFileInput');
+      const statusDiv = document.getElementById('cvUploadStatus');
+      if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Silakan pilih file PDF CV terlebih dahulu.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('cv', fileInput.files[0]);
+
+      statusDiv.innerHTML = '<span style="color: var(--primary);">⏳ Sedang mengunggah dan menganalisis teks CV...</span>';
+
+      try {
+        const res = await fetch('/api/upload-cv', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusDiv.innerHTML = `<span style="color: var(--success); font-weight: 600;">[✓] ${data.message} (${data.char_count} karakter terdeteksi). Skor ATS sekarang akan aktif saat memindai lowongan!</span>`;
+        } else {
+          statusDiv.innerHTML = `<span style="color: var(--danger);">[x] ${data.error}</span>`;
+        }
+      } catch (e) {
+        statusDiv.innerHTML = '<span style="color: var(--danger);">[x] Gagal mengunggah file</span>';
+      }
+    }
+
     async function startScan() {
       const platform = document.getElementById('platformSelect').value;
       const btn = document.getElementById('btnScan');
@@ -418,7 +467,7 @@
 
         if (data.success && data.jobs && data.jobs.length > 0) {
           foundJobs = data.jobs;
-          status.innerText = `[✓] Ditemukan ${foundJobs.length} lowongan/magang cocok!`;
+          status.innerText = `[✓] Ditemukan ${foundJobs.length} lowongan cocok!`;
           renderJobs();
         } else {
           status.innerText = `[-] Tidak ada lowongan baru yang cocok di ${platform.toUpperCase()} saat ini.`;
@@ -439,16 +488,22 @@
         const card = document.createElement('div');
         card.className = 'job-card';
         card.id = `job-${index}`;
+        
+        const ats = job.ats || { score: 70, status: 'Sedang' };
+        const atsScoreBadge = `<span class="badge badge-ats">🎯 ATS Match: ${ats.score}% (${ats.status})</span>`;
+
         card.innerHTML = `
           <div class="job-header">
             <div>
               <a href="${job.url}" target="_blank" class="job-title">${job.title}</a>
               <div class="job-company">${job.company}</div>
             </div>
+            ${atsScoreBadge}
           </div>
           <div class="job-badges">
             <span class="badge badge-salary">${job.salary || 'Gaji/Uang saku tidak dicantumkan'}</span>
             ${job.location ? `<span class="badge">${job.location}</span>` : ''}
+            ${ats.matched && ats.matched.length ? `<span class="badge" style="color:#38bdf8;">Keahlian Cocok: ${ats.matched.join(', ')}</span>` : ''}
           </div>
           <div class="job-actions">
             <button class="btn btn-success btn-sm" onclick="applyJob(${index})">✅ Lamar Otomatis</button>
@@ -549,7 +604,7 @@
     }
 
     async function moveKanban(url, newStatus) {
-      const note = prompt('Catatan perkembangan (opsional, misal: Jadwal interview tgl 20 Nov):');
+      const note = prompt('Catatan perkembangan (misal: Wawancara HR tgl 20 Nov):');
       try {
         await fetch('/api/status-update', {
           method: 'POST',
@@ -637,7 +692,7 @@
           statusDiv.innerHTML = `<span style="color: var(--danger);">[x] ${data.message}</span>`;
         }
       } catch (e) {
-        statusDiv.innerHTML = '<span style="color: var(--danger);">[x] Gagal memanggil endpoint kirim email</span>';
+        statusDiv.innerHTML = '<span style="color: var(--danger);">[x] Gagal mengirim email</span>';
       }
     }
 
