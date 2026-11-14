@@ -1,0 +1,28 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Browser User Data / Session (Jangan di-commit karena berisi cookie & login pribadi)
+user_browser_data/
+*.session
+
+# Local User Data & History
+data/history.json
+data/*.csv
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
