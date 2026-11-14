@@ -5,40 +5,42 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
 echo "========================================================="
-echo "       JOB HUNTER COPILOT - SETUP & LAUNCHER (LINUX)     "
+echo "       LOKER-CLI SETUP & LAUNCHER (LINUX / MACOS)        "
 echo "========================================================="
 echo ""
 
-# 1. Cek Python3
 if ! command -v python3 &> /dev/null; then
-    echo "[ERROR] python3 tidak ditemukan di sistem kamu!"
-    echo "Silakan install python3 (misal: sudo apt update && sudo apt install python3 python3-venv python3-pip)"
+    echo "[ERROR] python3 tidak ditemukan!"
+    echo "Silakan pasang python3 dan python3-venv lewat package manager distro kamu."
     exit 1
 fi
 
-# 2. Cek / Buat venv
 if [ ! -d ".venv" ]; then
-    echo "[*] Membuat Virtual Environment Python (.venv)..."
+    echo "[*] Membuat Virtual Environment (.venv)..."
     python3 -m venv .venv
-    echo "[OK] Virtual Environment berhasil dibuat."
 fi
 
-# 3. Aktifkan venv
 source .venv/bin/activate
 
-# 4. Install dependencies
-echo "[*] Memeriksa & menginstall dependencies..."
-python3 -m pip install --upgrade pip --quiet
-pip install -r requirements.txt --quiet
-
-# 5. Pastikan Chromium Playwright terpasang
-echo "[*] Memastikan browser Chromium Playwright terpasang..."
+echo "[*] Memeriksa modul dan browser Playwright..."
+python3 -m pip install -r requirements.txt --quiet
 playwright install chromium
 
-# 6. Jalankan aplikasi
 echo ""
 echo "========================================================="
-echo "             MEMULAI JOB HUNTER COPILOT...               "
+echo "                PILIH MODE TAMPILAN                      "
 echo "========================================================="
+echo "[1] Web Dashboard (Tampilan Visual di Browser - Rekomendasi)"
+echo "[2] Terminal CLI  (Mode Teks Cepat)"
 echo ""
-python3 main.py
+read -p "Pilih mode [1 atau 2, tekan ENTER untuk Web]: " user_choice
+
+if [ "$user_choice" = "2" ]; then
+    echo ""
+    echo "[*] Memulai Terminal CLI..."
+    python3 main.py
+else
+    echo ""
+    echo "[*] Membuka Web Dashboard di browser (http://127.0.0.1:5000)..."
+    python3 web_app.py
+fi

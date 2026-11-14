@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>loker-cli Dashboard — Asisten Pencari Kerja</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); line-height: 1.5; padding: 20px; }
+    .container { max-width: 1050px; margin: 0 auto; }
+    
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 25px; }
+    .brand { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
+    .tagline { font-size: 0.85rem; color: var(--text-muted); }
+
+    .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+    .tab-btn { background: var(--card-bg); color: var(--text-muted); border: 1px solid var(--border); padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: all 0.2s; }
+    .tab-btn.active { background: var(--primary); color: #000; border-color: var(--primary); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .card-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 15px; color: var(--text); }
+
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    input[type="text"], select, textarea {
+      width: 100%; padding: 10px 14px; background: #0b1120; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; transition: 0.2s; }
+    .btn-primary { background: var(--primary); color: #000; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-secondary { background: #334155; color: var(--text); }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+    .job-list { display: grid; gap: 16px; margin-top: 20px; }
+    .job-card { background: #162032; border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+    .job-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .job-title { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; }
+    .job-company { font-size: 0.9rem; color: var(--primary); }
+    .job-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: #0f172a; border: 1px solid var(--border); color: var(--text-muted); }
+    .badge-salary { color: var(--success); border-color: rgba(34, 197, 94, 0.3); }
+
+    .job-actions { display: flex; gap: 10px; margin-top: 5px; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .stat-card { background: #162032; border: 1px solid var(--border); padding: 15px; border-radius: 10px; text-align: center; }
+    .stat-val { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
+    .stat-lbl { font-size: 0.85rem; color: var(--text-muted); }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
+    
+    .status-applied { color: var(--success); font-weight: 600; }
+    .status-skipped { color: var(--danger); font-weight: 600; }
+
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(0,0,0,0.3); border-radius: 50%; border-top-color: #000; animation: spin 0.8s linear infinite; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="brand">loker-cli Dashboard</div>
+        <div class="tagline">Peninjauan & Lamaran Kerja Multi-Platform (Glints & JobStreet)</div>
+      </div>
+      <div>
+        <span class="badge" id="activeProfileBadge">Profil: Memuat...</span>
+      </div>
+    </header>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('huntTab')">🔍 Berburu Lowongan</button>
+      <button class="tab-btn" onclick="switchTab('profileTab')">⚙️ Profil & Filter</button>
+      <button class="tab-btn" onclick="switchTab('historyTab')">📊 Riwayat & Laporan</button>
+    </div>
+
+    <!-- TAB 1: HUNT & REVIEW -->
+    <div id="huntTab" class="tab-content active">
+      <div class="card">
+        <div class="card-title">Pindai Lowongan Pekerjaan</div>
+        <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+          <div class="form-group" style="flex: 1; min-width: 220px; margin-bottom: 0;">
+            <label>Pilih Platform</label>
+            <select id="platformSelect">
+              <option value="glints">Glints Indonesia</option>
+              <option value="jobstreet">JobStreet Indonesia (SEEK)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btnScan" onclick="startScan()">
+            <span id="scanBtnText">🔍 Mulai Pindai Sekarang</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="scanStatus" style="display: none; padding: 12px; background: #1e293b; border-radius: 8px; margin-bottom: 15px; font-size: 0.9rem; color: var(--primary);"></div>
+
+      <div id="jobsContainer" class="job-list">
+        <!-- Kartu lowongan akan dirender di sini secara dinamis -->
+      </div>
+    </div>
+
+    <!-- TAB 2: PROFILE & FILTER -->
+    <div id="profileTab" class="tab-content">
+      <div class="card">
+        <div class="card-title">Pengaturan Profil & Filter Jurusan</div>
+        <div class="form-group">
+          <label>Bidang / Jurusan Kamu</label>
+          <input type="text" id="cfgMajor" placeholder="Contoh: Akuntansi, Desain Grafis, Teknik Informatika">
+        </div>
+        <div class="form-group">
+          <label>Kata Kunci Posisi yang Dicari (Pisahkan dengan koma)</label>
+          <input type="text" id="cfgKeywords" placeholder="Contoh: Staff Akuntansi, Finance Staff, Tax Officer">
+        </div>
+        <div class="form-group">
+          <label>Tingkat Pengalaman</label>
+          <select id="cfgExp">
+            <option value="fresh_graduate">Fresh Graduate (0 tahun)</option>
+            <option value="junior">Junior (1 - 2 tahun)</option>
+            <option value="mid">Mid-Level (3 - 4 tahun)</option>
+            <option value="senior">Senior (5+ tahun)</option>
+            <option value="all">Semua Level</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Kata Kunci Terlarang (Blacklist — Pisahkan dengan koma)</label>
+          <input type="text" id="cfgBlacklist" placeholder="Contoh: SPG, Sales Lapangan, Canvasser, Asuransi">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Simpan Perubahan Profil</button>
+      </div>
+    </div>
+
+    <!-- TAB 3: HISTORY & EXPORT -->
+    <div id="historyTab" class="tab-content">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-val" id="statApplied">0</div>
+          <div class="stat-lbl">Lamaran Terkirim</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="statSkipped" style="color: var(--danger);">0</div>
+          <div class="stat-lbl">Lowongan Dilewati</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <div class="card-title" style="margin-bottom: 0;">Riwayat Aktivitas</div>
+          <a href="/api/export" class="btn btn-secondary btn-sm" download>📥 Unduh Rekap (CSV/Excel)</a>
+        </div>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Posisi</th>
+                <th>Perusahaan</th>
+                <th>Waktu</th>
+                <th>Keterangan</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <!-- Riwayat dinamis -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentConfig = null;
+    let foundJobs = [];
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.target.classList.add('active');
+      if (tabId === 'historyTab') loadHistory();
+    }
+
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/config');
+        currentConfig = await res.json();
+        const prof = currentConfig.profile || {};
+        
+        document.getElementById('cfgMajor').value = prof.field_or_major || '';
+        document.getElementById('cfgKeywords').value = (prof.target_keywords || []).join(', ');
+        document.getElementById('cfgExp').value = prof.experience_level || 'junior';
+        document.getElementById('cfgBlacklist').value = (prof.blacklist_keywords || []).join(', ');
+        
+        document.getElementById('activeProfileBadge').innerText = 
+          `${prof.field_or_major || 'Umum'} (${prof.experience_level || 'all'})`;
+      } catch (e) {
+        console.error('Gagal memuat config:', e);
+      }
+    }
+
+    async function saveSettings() {
+      const prof = {
+        field_or_major: document.getElementById('cfgMajor').value.trim(),
+        target_keywords: document.getElementById('cfgKeywords').value.split(',').map(s => s.trim()).filter(Boolean),
+        experience_level: document.getElementById('cfgExp').value,
+        blacklist_keywords: document.getElementById('cfgBlacklist').value.split(',').map(s => s.trim()).filter(Boolean)
+      };
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: prof })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Pengaturan profil berhasil disimpan!');
+          loadConfig();
+        }
+      } catch (e) {
+        alert('Terjadi kesalahan saat menyimpan pengaturan.');
+      }
+    }
+
+    async function startScan() {
+      const platform = document.getElementById('platformSelect').value;
+      const btn = document.getElementById('btnScan');
+      const status = document.getElementById('scanStatus');
+      const container = document.getElementById('jobsContainer');
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Sedang Memindai...';
+      status.style.display = 'block';
+      status.innerText = `[*] Membuka browser dan memindai lowongan di ${platform.toUpperCase()}... Jendela browser akan terbuka, pastikan kamu sudah login jika diminta.`;
+      container.innerHTML = '';
+
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: platform })
+        });
+        const data = await res.json();
+
+        if (data.success && data.jobs && data.jobs.length > 0) {
+          foundJobs = data.jobs;
+          status.innerText = `[✓] Berhasil menemukan ${foundJobs.length} lowongan yang cocok dengan profil kamu!`;
+          renderJobs();
+        } else {
+          status.innerText = `[-] Tidak ada lowongan baru yang cocok di ${platform.toUpperCase()} saat ini.`;
+        }
+      } catch (e) {
+        status.innerText = `[x] Kendala saat memindai: ${e.message || 'Koneksi terputus'}`;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '🔍 Mulai Pindai Sekarang';
+      }
+    }
+
+    function renderJobs() {
+      const container = document.getElementById('jobsContainer');
+      container.innerHTML = '';
+
+      foundJobs.forEach((job, index) => {
+        const card = document.createElement('div');
+        card.className = 'job-card';
+        card.id = `job-${index}`;
+        card.innerHTML = `
+          <div class="job-header">
+            <div>
+              <a href="${job.url}" target="_blank" class="job-title">${job.title}</a>
+              <div class="job-company">${job.company}</div>
+            </div>
+          </div>
+          <div class="job-badges">
+            <span class="badge badge-salary">${job.salary || 'Gaji tidak dicantumkan'}</span>
+            ${job.location ? `<span class="badge">${job.location}</span>` : ''}
+          </div>
+          <div class="job-actions">
+            <button class="btn btn-success btn-sm" onclick="applyJob(${index})">✅ Lamar Otomatis</button>
+            <button class="btn btn-secondary btn-sm" onclick="skipJob(${index})">⏭️ Lewati</button>
+            <a href="${job.url}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;">🔗 Buka Link</a>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    async function applyJob(index) {
+      const job = foundJobs[index];
+      const platform = document.getElementById('platformSelect').value;
+      const card = document.getElementById(`job-${index}`);
+
+      card.style.opacity = '0.5';
+      const actions = card.querySelector('.job-actions');
+      actions.innerHTML = '<span style="font-size: 0.85rem; color: var(--primary);">⏳ Sedang mengeksekusi lamaran di browser...</span>';
+
+      try {
+        const res = await fetch('/api/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platform: platform,
+            url: job.url,
+            title: job.title,
+            company: job.company
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.result.status === 'success') {
+          actions.innerHTML = '<span style="color: var(--success); font-weight: 600;">[✓] Lamaran Berhasil Dikirim!</span>';
+        } else {
+          actions.innerHTML = `<span style="color: var(--warning); font-size: 0.85rem;">[!] ${data.result ? data.result.message : 'Silakan selesaikan di browser'}</span>`;
+        }
+      } catch (e) {
+        actions.innerHTML = '<span style="color: var(--danger); font-size: 0.85rem;">[x] Gagal mengirim</span>';
+      }
+    }
+
+    async function skipJob(index) {
+      const job = foundJobs[index];
+      const card = document.getElementById(`job-${index}`);
+      card.remove();
+
+      try {
+        await fetch('/api/skip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: job.url,
+            title: job.title,
+            company: job.company,
+            notes: 'Dilewati via Web UI'
+          })
+        });
+      } catch (e) {}
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        const applied = data.applied || [];
+        const skipped = data.skipped || [];
+
+        document.getElementById('statApplied').innerText = applied.length;
+        document.getElementById('statSkipped').innerText = skipped.length;
+
+        const tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '';
+
+        applied.slice(-15).reverse().forEach(item => {
+          const row = `<tr>
+            <td class="status-applied">Dilamar</td>
+            <td><a href="${item.url}" target="_blank" style="color:#fff; text-decoration:none;">${item.title || '-'}</a></td>
+            <td>${item.company || '-'}</td>
+            <td>${item.timestamp || '-'}</td>
+            <td>${item.notes || '-'}</td>
+          </tr>`;
+          tbody.innerHTML += row;
+        });
+
+        skipped.slice(-10).reverse().forEach(item => {
+          const row = `<tr>
+            <td class="status-skipped">Dilewati</td>
+            <td><a href="${item.url}" target="_blank" style="color:#94a3b8; text-decoration:none;">${item.title || '-'}</a></td>
+            <td>${item.company || '-'}</td>
+            <td>${item.timestamp || '-'}</td>
+            <td>${item.notes || '-'}</td>
+          </tr>`;
+          tbody.innerHTML += row;
+        });
+      } catch (e) {
+        console.error('Gagal memuat riwayat:', e);
+      }
+    }
+
+    // Inisialisasi saat halaman dibuka
+    loadConfig();
+  </script>
+</body>
+</html>

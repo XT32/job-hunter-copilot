@@ -3,20 +3,49 @@
 [![Unit Tests](https://github.com/XT32/job-hunter-copilot/actions/workflows/test.yml/badge.svg)](https://github.com/XT32/job-hunter-copilot/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-CLI tool untuk meninjau dan mengirim lamaran kerja di berbagai portal loker (**Glints** & **JobStreet Indonesia**) secara semi-otomatis (*human-in-the-loop*).
+Tool bantu pencari kerja untuk meninjau dan mengirim lamaran di berbagai portal loker (**Glints** & **JobStreet Indonesia**) secara semi-otomatis (*human-in-the-loop*).
 
-Dirancang untuk menghemat waktu browsing puluhan tab tanpa risiko akun kena penalti, tanpa biaya API pihak ketiga, dan ramah untuk laptop dengan spesifikasi standar/rendah.
+Tersedia dalam 2 mode: **Web Dashboard Visual (untuk pengguna awam/umum)** dan **Terminal CLI (untuk pengguna cepat)**.
 
 ---
 
-## Karakteristik & Fitur Utama
+## 📥 Cara Pakai Tanpa Install Git (Untuk Pengguna Umum)
 
-- **Multi-Platform Support:** Mendukung **Glints Indonesia** dan **JobStreet Indonesia (SEEK)** melalui antarmuka seragam (`BaseJobHunter`).
-- **Sistem Profil & Filter Jurusan (`src/matcher.py`):** Tidak asal tembak lowongan. Anda dapat mengatur jurusan/bidang, kata kunci target, serta tingkat pengalaman (Fresh Graduate, Junior, Mid, Senior).
-- **Auto-Blacklist & Anti-Zonk:** Otomatis melewati lowongan yang tidak relevan, loker penipuan/sales lapangan, atau posisi yang levelnya terlalu tinggi (misal: posisi "Lead/Manager" jika profil Anda adalah Fresh Graduate).
-- **Kendali Manual (Human-in-the-loop):** Setiap lowongan yang lolos filter ditampilkan ringkasannya di terminal, dan pengguna yang memutuskan: melamar (`y`), melewati (`s`), atau membuka tab detail (`o`).
-- **Deteksi Tautan Eksternal:** Lowongan yang mengarahkan ke form eksternal (Workable, Greenhouse, dsb) dideteksi dan dilewati secara aman agar tidak memicu error.
-- **Ekspor Riwayat ke CSV/Excel:** Seluruh riwayat lamaran (terkirim maupun dilewati) dapat diekspor langsung ke `data/riwayat_lamaran.csv` untuk arsip pribadi atau pelaporan.
+Bagi kamu atau teman kamu yang **tidak paham Git** atau **tidak punya Git di laptop**:
+
+1. Klik tombol hijau **`Code`** di bagian atas halaman GitHub ini, lalu klik **`Download ZIP`** (atau [klik link download ini](https://github.com/XT32/job-hunter-copilot/archive/refs/heads/main.zip)).
+2. Ekstrak file zip hasil download ke folder mana saja (misal di folder *Documents* atau *Desktop*).
+3. Buka foldernya, lalu:
+   - **Di Windows:** Cukup klik dua kali file **`start_windows.bat`**.
+   - **Di Linux / macOS:** Buka terminal dan jalankan `./start_linux.sh`.
+4. Pilih opsi **`[1] Web Dashboard`** (atau cukup tekan `ENTER`). Halaman dashboard visual akan otomatis terbuka di browser kamu!
+
+> *Catatan: Pastikan komputer kamu sudah terpasang [Python](https://www.python.org/downloads/) (versi 3.8 ke atas). Di Windows, pastikan mencentang "Add python.exe to PATH" saat menginstall Python.*
+
+---
+
+## 🌟 Pilihan Mode Tampilan
+
+### 1. Web Dashboard Visual (`web_app.py`)
+Cocok untuk pengguna yang menyukai tampilan visual:
+- Tampilan berbasis kartu lowongan (Judul, Perusahaan, Gaji, Lokasi).
+- Tombol aksi visual: **`✅ Lamar Otomatis`**, **`⏭️ Lewati`**, dan **`🔗 Buka Link`**.
+- Form pengaturan profil jurusan dan filter kata kunci tanpa perlu edit file JSON.
+- Tabel riwayat interaktif dengan tombol **`📥 Unduh Rekap (CSV/Excel)`**.
+
+### 2. Terminal CLI (`main.py`)
+Cocok untuk pengguna teknis yang menginginkan eksekusi super cepat dan hemat resource.
+
+---
+
+## 🛡️ Karakteristik & Keamanan
+
+- **Multi-Platform Support:** Mendukung **Glints Indonesia** dan **JobStreet Indonesia (SEEK)**.
+- **Sistem Profil & Filter Jurusan (`src/matcher.py`):** Tidak asal tembak lowongan. Kamu dapat mengatur jurusan/bidang, kata kunci target, serta tingkat pengalaman (Fresh Graduate, Junior, Mid, Senior).
+- **Auto-Blacklist & Anti-Zonk:** Otomatis melewati lowongan yang tidak relevan, loker penipuan/sales lapangan, atau posisi yang levelnya terlalu tinggi (misal: posisi "Lead/Manager" jika profil kamu adalah Fresh Graduate).
+- **Kendali Manual (Human-in-the-loop):** Setiap lowongan yang lolos filter ditampilkan untuk kamu putuskan apakah ingin dilamar atau dilewati.
+- **Deteksi Tautan Eksternal:** Lowongan yang mengarahkan ke form eksternal (Workable, Greenhouse, dsb) dideteksi dan dilewati secara aman.
+- **Ekspor Riwayat ke CSV/Excel:** Seluruh riwayat lamaran dapat diunduh kapan saja untuk arsip pribadi atau pelaporan.
 - **Konservasi Memori (Low RAM):** Menggunakan flag Chromium khusus (`--disable-gpu`, `--renderer-process-limit=2`, dll) agar tetap lancar di perangkat dengan RAM 4GB.
 - **Sesi Lokal Aman:** Sesi login disimpan di direktori lokal (`user_browser_data/`) dan otomatis diabaikan oleh Git, sehingga data kredensial tidak pernah keluar dari komputer pengguna.
 
@@ -31,45 +60,9 @@ Dirancang untuk menghemat waktu browsing puluhan tab tanpa risiko akun kena pena
 
 ---
 
-## Cara Menjalankan
-
-### Windows
-1. Pastikan Python sudah terpasang dan opsi **"Add python.exe to PATH"** dicentang saat instalasi.
-2. Clone atau unduh repositori ini.
-3. Jalankan dengan klik dua kali file:
-   ```text
-   start_windows.bat
-   ```
-   *(Script otomatis membuat virtual environment, memasang pustaka yang diperlukan, dan menjalankan program).*
-
-### Linux / macOS
-Jalankan melalui terminal:
-```bash
-chmod +x start_linux.sh
-./start_linux.sh
-```
-
----
-
-## Alur Penggunaan
-
-1. **Onboarding Awal:** Saat pertama kali dijalankan, sistem otomatis menanyakan jurusan, kata kunci target, dan tingkat pengalaman Anda.
-2. **Pilih Platform:** 
-   - Opsi `[1]` untuk Glints Indonesia.
-   - Opsi `[2]` untuk JobStreet Indonesia.
-3. **Login Browser:** Browser akan terbuka. Jika belum login ke akun portal terkait, lakukan login satu kali di jendela browser, lalu tekan `ENTER` di terminal.
-4. **Review Lowongan:**
-   - Tekan **`y`** (atau `Enter`) untuk melamar otomatis.
-   - Tekan **`s`** untuk melewati.
-   - Tekan **`o`** untuk melihat detail di browser sebelum memutuskan.
-   - Tekan **`q`** untuk berhenti dan kembali ke menu.
-5. **Ekspor Laporan:** Pilih opsi `[3]` untuk melihat riwayat dan mengekspor data ke file CSV.
-
----
-
 ## Menjalankan Unit Tests
 
-Repositori ini dilengkapi rangkaian pengujian otomatis tanpa dependensi eksternal:
+Repositori ini dilengkapi rangkaian pengujian otomatis:
 
 ```bash
 python -m unittest discover tests -v
