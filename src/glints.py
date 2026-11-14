@@ -4,11 +4,13 @@ from src.base_hunter import BaseJobHunter
 from src.browser import human_delay
 from src.storage import is_job_recorded, record_job
 from src.matcher import JobMatcher
+from src.screener import ScreeningAutoFiller
 
 class GlintsHunter(BaseJobHunter):
     def __init__(self, page, config):
         super().__init__(page, config)
         self.matcher = JobMatcher(config.get("profile", {}))
+        self.screener = ScreeningAutoFiller(page, config.get("screening_defaults", {}))
 
     def check_login_status(self) -> bool:
         """Memeriksa apakah user sudah login ke Glints"""
@@ -44,7 +46,6 @@ class GlintsHunter(BaseJobHunter):
 
         jobs = []
         
-        # Scroll bertahap untuk trigger pemuatan kartu loker
         for _ in range(2):
             self.page.mouse.wheel(0, 800)
             time.sleep(1)
@@ -79,7 +80,6 @@ class GlintsHunter(BaseJobHunter):
                         salary = line.strip()
                         break
 
-                # Evaluasi kecocokan dengan profil pengguna (Jurusan, Pengalaman, Blacklist)
                 is_match, reason = self.matcher.evaluate(title, company)
                 if not is_match:
                     record_job(clean_url, title, company, status="skipped", notes=f"Filter profil: {reason}")
@@ -97,7 +97,7 @@ class GlintsHunter(BaseJobHunter):
         return jobs
 
     def inspect_and_apply(self, job_url: str) -> dict:
-        """Membuka halaman detail loker dan mengeksekusi lamaran dengan validasi keamanan"""
+        """Membuka halaman detail loker dan mengeksekusi lamaran dengan validasi keamanan & auto-screening"""
         try:
             self.page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
             human_delay(1.5, 2.5)
@@ -112,7 +112,7 @@ class GlintsHunter(BaseJobHunter):
         except Exception:
             pass
 
-        # 2. Cek apakah ini tautan eksternal (mengarahkan ke web perusahaan luar)
+        # 2. Cek apakah ini tautan eksternal
         external_btn = self.page.locator("button:has-text('situs web perusahaan'), a:has-text('situs web perusahaan')").first
         try:
             if external_btn.is_visible(timeout=1500):
@@ -132,7 +132,11 @@ class GlintsHunter(BaseJobHunter):
             apply_btn.click()
             human_delay(1.5, 2.5)
 
-            # 4. Tangani modal konfirmasi
+            # 4. Auto-Fill Screening Questions jika muncul input gaji / kuesioner
+            self.screener.auto_fill_form()
+            human_delay(1, 2)
+
+            # 5. Tangani modal konfirmasi
             confirm_btn = self.page.locator("button:has-text('Kirim Lamaran'), button:has-text('Kirim'), button:has-text('Lanjut')").first
             if confirm_btn.is_visible(timeout=3000):
                 confirm_btn.click()

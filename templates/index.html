@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>loker-cli Dashboard — Asisten Pencari Kerja</title>
+  <title>loker-cli Dashboard — Asisten Karir & Magang</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -16,18 +16,19 @@
       --success: #22c55e;
       --danger: #ef4444;
       --warning: #f59e0b;
+      --purple: #a855f7;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: var(--bg); color: var(--text); line-height: 1.5; padding: 20px; }
-    .container { max-width: 1050px; margin: 0 auto; }
+    .container { max-width: 1100px; margin: 0 auto; }
     
     header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 25px; }
     .brand { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
     .tagline { font-size: 0.85rem; color: var(--text-muted); }
 
-    .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-    .tab-btn { background: var(--card-bg); color: var(--text-muted); border: 1px solid var(--border); padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: all 0.2s; }
+    .nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab-btn { background: var(--card-bg); color: var(--text-muted); border: 1px solid var(--border); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.2s; }
     .tab-btn.active { background: var(--primary); color: #000; border-color: var(--primary); }
 
     .tab-content { display: none; }
@@ -37,18 +38,20 @@
     .card-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 15px; color: var(--text); }
 
     .form-group { margin-bottom: 15px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
-    input[type="text"], select, textarea {
+    input[type="text"], input[type="email"], input[type="password"], select, textarea {
       width: 100%; padding: 10px 14px; background: #0b1120; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem;
     }
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
 
-    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; transition: 0.2s; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; transition: 0.2s; text-decoration: none; }
     .btn-primary { background: var(--primary); color: #000; }
     .btn-primary:hover { background: var(--primary-hover); }
     .btn-success { background: var(--success); color: #fff; }
     .btn-danger { background: var(--danger); color: #fff; }
     .btn-secondary { background: #334155; color: var(--text); }
+    .btn-purple { background: var(--purple); color: #fff; }
     .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
 
     .job-list { display: grid; gap: 16px; margin-top: 20px; }
@@ -60,19 +63,22 @@
     .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: #0f172a; border: 1px solid var(--border); color: var(--text-muted); }
     .badge-salary { color: var(--success); border-color: rgba(34, 197, 94, 0.3); }
 
-    .job-actions { display: flex; gap: 10px; margin-top: 5px; }
+    .job-actions { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
 
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-    .stat-card { background: #162032; border: 1px solid var(--border); padding: 15px; border-radius: 10px; text-align: center; }
-    .stat-val { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
-    .stat-lbl { font-size: 0.85rem; color: var(--text-muted); }
+    /* KANBAN BOARD */
+    .kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-top: 15px; }
+    .kanban-col { background: #162032; border: 1px solid var(--border); border-radius: 10px; padding: 15px; min-height: 380px; display: flex; flex-direction: column; }
+    .kanban-header { font-weight: 700; font-size: 0.95rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+    .kanban-items { display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; max-height: 480px; }
+    .kanban-card { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 0.85rem; }
+    .kanban-card-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .kanban-card-company { color: var(--primary); font-size: 0.8rem; margin-bottom: 6px; }
+    .kanban-card-select { margin-top: 8px; font-size: 0.75rem; padding: 4px 8px; }
 
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
-    th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
-    th { color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
-    
-    .status-applied { color: var(--success); font-weight: 600; }
-    .status-skipped { color: var(--danger); font-weight: 600; }
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; max-width: 650px; width: 100%; padding: 25px; max-height: 90vh; overflow-y: auto; }
 
     .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(0,0,0,0.3); border-radius: 50%; border-top-color: #000; animation: spin 0.8s linear infinite; margin-right: 8px; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -83,7 +89,7 @@
     <header>
       <div>
         <div class="brand">loker-cli Dashboard</div>
-        <div class="tagline">Peninjauan & Lamaran Kerja Multi-Platform (Glints & JobStreet)</div>
+        <div class="tagline">Asisten Karir & Magang Multi-Platform (Glints, JobStreet, MagangHub Kemnaker)</div>
       </div>
       <div>
         <span class="badge" id="activeProfileBadge">Profil: Memuat...</span>
@@ -91,21 +97,23 @@
     </header>
 
     <div class="nav-tabs">
-      <button class="tab-btn active" onclick="switchTab('huntTab')">🔍 Berburu Lowongan</button>
-      <button class="tab-btn" onclick="switchTab('profileTab')">⚙️ Profil & Filter</button>
-      <button class="tab-btn" onclick="switchTab('historyTab')">📊 Riwayat & Laporan</button>
+      <button class="tab-btn active" onclick="switchTab('huntTab')">🔍 Berburu Loker & Magang</button>
+      <button class="tab-btn" onclick="switchTab('kanbanTab')">📋 Papan Pelacak (Kanban)</button>
+      <button class="tab-btn" onclick="switchTab('emailTab')">✉️ Cold Email HRD</button>
+      <button class="tab-btn" onclick="switchTab('profileTab')">⚙️ Pengaturan & Screening</button>
     </div>
 
     <!-- TAB 1: HUNT & REVIEW -->
     <div id="huntTab" class="tab-content active">
       <div class="card">
-        <div class="card-title">Pindai Lowongan Pekerjaan</div>
+        <div class="card-title">Pindai Lowongan / Program Magang</div>
         <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
-          <div class="form-group" style="flex: 1; min-width: 220px; margin-bottom: 0;">
-            <label>Pilih Platform</label>
+          <div class="form-group" style="flex: 1; min-width: 240px; margin-bottom: 0;">
+            <label>Pilih Platform Sasaran</label>
             <select id="platformSelect">
               <option value="glints">Glints Indonesia</option>
               <option value="jobstreet">JobStreet Indonesia (SEEK)</option>
+              <option value="maganghub">MagangHub Kemnaker (Program Magang Nasional)</option>
             </select>
           </div>
           <button class="btn btn-primary" id="btnScan" onclick="startScan()">
@@ -116,21 +124,105 @@
 
       <div id="scanStatus" style="display: none; padding: 12px; background: #1e293b; border-radius: 8px; margin-bottom: 15px; font-size: 0.9rem; color: var(--primary);"></div>
 
-      <div id="jobsContainer" class="job-list">
-        <!-- Kartu lowongan akan dirender di sini secara dinamis -->
+      <div id="jobsContainer" class="job-list"></div>
+    </div>
+
+    <!-- TAB 2: KANBAN TRACKER -->
+    <div id="kanbanTab" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <div class="card-title" style="margin-bottom: 0;">Papan Pelacak Status Lamaran (Pipeline)</div>
+        <a href="/api/export" class="btn btn-secondary btn-sm">📥 Unduh Rekap (CSV/Excel)</a>
+      </div>
+
+      <div class="kanban-board">
+        <div class="kanban-col">
+          <div class="kanban-header" style="color: var(--primary);">
+            <span>📨 Terkirim (Applied)</span>
+            <span id="countApplied">0</span>
+          </div>
+          <div class="kanban-items" id="colApplied"></div>
+        </div>
+
+        <div class="kanban-col">
+          <div class="kanban-header" style="color: var(--warning);">
+            <span>💬 Panggilan Interview</span>
+            <span id="countInterview">0</span>
+          </div>
+          <div class="kanban-items" id="colInterview"></div>
+        </div>
+
+        <div class="kanban-col">
+          <div class="kanban-header" style="color: var(--success);">
+            <span>🏆 Offering / Diterima</span>
+            <span id="countOffering">0</span>
+          </div>
+          <div class="kanban-items" id="colOffering"></div>
+        </div>
+
+        <div class="kanban-col">
+          <div class="kanban-header" style="color: var(--danger);">
+            <span>❌ Ditolak / Gugur</span>
+            <span id="countRejected">0</span>
+          </div>
+          <div class="kanban-items" id="colRejected"></div>
+        </div>
       </div>
     </div>
 
-    <!-- TAB 2: PROFILE & FILTER -->
+    <!-- TAB 3: DIRECT COLD EMAIL -->
+    <div id="emailTab" class="tab-content">
+      <div class="card">
+        <div class="card-title">Kirim Lamaran Langsung ke Email HRD (Cold Email)</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Alamat Email HRD / Perusahaan</label>
+            <input type="email" id="emailTo" placeholder="Contoh: hrd@perusahaan.com">
+          </div>
+          <div class="form-group">
+            <label>Nama Perusahaan</label>
+            <input type="text" id="emailCompany" placeholder="Contoh: PT Solusi Inovasi">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Posisi Pekerjaan yang Dilamar</label>
+          <input type="text" id="emailRole" placeholder="Contoh: Staff Akuntansi">
+        </div>
+        <div class="form-group">
+          <label>Subjek Email</label>
+          <input type="text" id="emailSubject" placeholder="Subjek email otomatis akan dibuatkan">
+        </div>
+        <div class="form-group">
+          <label>Isi Surat Lamaran (Body Email)</label>
+          <textarea id="emailBody" rows="8" placeholder="Tulis isi email atau klik 'Buat Template' di bawah..."></textarea>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" onclick="generateEmailDraft()">📄 Buat Draft Otomatis</button>
+          <button class="btn btn-primary" onclick="sendDirectEmail()">✉️ Kirim Lamaran + Lampirkan CV</button>
+        </div>
+        <div id="emailStatus" style="margin-top: 15px; font-size: 0.9rem;"></div>
+      </div>
+    </div>
+
+    <!-- TAB 4: PROFILE & SETTINGS -->
     <div id="profileTab" class="tab-content">
       <div class="card">
-        <div class="card-title">Pengaturan Profil & Filter Jurusan</div>
+        <div class="card-title">1. Profil Pencari Kerja & Jurusan</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nama Lengkap Kamu</label>
+            <input type="text" id="cfgName" placeholder="Contoh: Budi Pratama, S.Ak">
+          </div>
+          <div class="form-group">
+            <label>Kontak & LinkedIn (Untuk Cover Letter)</label>
+            <input type="text" id="cfgContact" placeholder="+62 812-xxxx-xxxx | linkedin.com/in/budi">
+          </div>
+        </div>
         <div class="form-group">
           <label>Bidang / Jurusan Kamu</label>
           <input type="text" id="cfgMajor" placeholder="Contoh: Akuntansi, Desain Grafis, Teknik Informatika">
         </div>
         <div class="form-group">
-          <label>Kata Kunci Posisi yang Dicari (Pisahkan dengan koma)</label>
+          <label>Kata Kunci Posisi yang Dicari (Pisahkan koma)</label>
           <input type="text" id="cfgKeywords" placeholder="Contoh: Staff Akuntansi, Finance Staff, Tax Officer">
         </div>
         <div class="form-group">
@@ -144,47 +236,77 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Kata Kunci Terlarang (Blacklist — Pisahkan dengan koma)</label>
+          <label>Kata Kunci Terlarang (Blacklist — Pisahkan koma)</label>
           <input type="text" id="cfgBlacklist" placeholder="Contoh: SPG, Sales Lapangan, Canvasser, Asuransi">
-        </div>
-        <button class="btn btn-primary" onclick="saveSettings()">💾 Simpan Perubahan Profil</button>
-      </div>
-    </div>
-
-    <!-- TAB 3: HISTORY & EXPORT -->
-    <div id="historyTab" class="tab-content">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-val" id="statApplied">0</div>
-          <div class="stat-lbl">Lamaran Terkirim</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="statSkipped" style="color: var(--danger);">0</div>
-          <div class="stat-lbl">Lowongan Dilewati</div>
         </div>
       </div>
 
       <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-          <div class="card-title" style="margin-bottom: 0;">Riwayat Aktivitas</div>
-          <a href="/api/export" class="btn btn-secondary btn-sm" download>📥 Unduh Rekap (CSV/Excel)</a>
+        <div class="card-title">2. Jawaban Otomatis Form Screening (Auto-Fill)</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Ekspektasi Gaji Default (Angka)</label>
+            <input type="text" id="cfgSalary" placeholder="6000000">
+          </div>
+          <div class="form-group">
+            <label>Notice Period</label>
+            <input type="text" id="cfgNotice" placeholder="Immediately / 1 Bulan">
+          </div>
         </div>
-        <div style="overflow-x: auto;">
-          <table>
-            <thead>
-              <tr>
-                <th>Status</th>
-                <th>Posisi</th>
-                <th>Perusahaan</th>
-                <th>Waktu</th>
-                <th>Keterangan</th>
-              </tr>
-            </thead>
-            <tbody id="historyTableBody">
-              <!-- Riwayat dinamis -->
-            </tbody>
-          </table>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Pengalaman Kerja (Tahun)</label>
+            <input type="text" id="cfgYears" placeholder="1">
+          </div>
+          <div class="form-group">
+            <label>Kota / Domisili Saat Ini</label>
+            <input type="text" id="cfgDomicile" placeholder="Jakarta">
+          </div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">3. Notifikasi Telegram Bot (Opsional & Gratis)</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Bot Token Telegram</label>
+            <input type="text" id="cfgTgToken" placeholder="Contoh: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+          </div>
+          <div class="form-group">
+            <label>Chat ID Telegram Kamu</label>
+            <input type="text" id="cfgTgChat" placeholder="Contoh: 987654321">
+          </div>
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="cfgTgEnabled" style="width: auto;">
+            Aktifkan notifikasi otomatis ke Telegram saat lowongan cocok ditemukan
+          </label>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveAllSettings()">💾 Simpan Semua Pengaturan</button>
+    </div>
+  </div>
+
+  <!-- MODAL PREVIEW COVER LETTER -->
+  <div class="modal-overlay" id="coverLetterModal">
+    <div class="modal">
+      <div class="card-title" id="clTitle">📄 Surat Lamaran (Cover Letter) Otomatis</div>
+      <div class="form-group">
+        <label>Pilih Gaya Template</label>
+        <select id="clPreset" onchange="regenerateCoverLetter()">
+          <option value="formal">Formal & Profesional (Standar Korporat)</option>
+          <option value="fresh_grad">Fresh Graduate (Antusias & Potensi Belajar)</option>
+          <option value="magang">Program Pemagangan (MagangHub / Kampus)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <textarea id="clText" rows="12"></textarea>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <button class="btn btn-secondary" onclick="closeModal()">Tutup</button>
+        <button class="btn btn-primary" onclick="copyCoverLetter()">📋 Salin Teks</button>
       </div>
     </div>
   </div>
@@ -192,13 +314,14 @@
   <script>
     let currentConfig = null;
     let foundJobs = [];
+    let activeCLJob = null;
 
     function switchTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
       event.target.classList.add('active');
-      if (tabId === 'historyTab') loadHistory();
+      if (tabId === 'kanbanTab') loadKanban();
     }
 
     async function loadConfig() {
@@ -206,11 +329,24 @@
         const res = await fetch('/api/config');
         currentConfig = await res.json();
         const prof = currentConfig.profile || {};
+        const scr = currentConfig.screening_defaults || {};
+        const tg = currentConfig.telegram || {};
         
+        document.getElementById('cfgName').value = prof.applicant_name || '';
+        document.getElementById('cfgContact').value = prof.contact_info || '';
         document.getElementById('cfgMajor').value = prof.field_or_major || '';
         document.getElementById('cfgKeywords').value = (prof.target_keywords || []).join(', ');
         document.getElementById('cfgExp').value = prof.experience_level || 'junior';
         document.getElementById('cfgBlacklist').value = (prof.blacklist_keywords || []).join(', ');
+
+        document.getElementById('cfgSalary').value = scr.expected_salary || '6000000';
+        document.getElementById('cfgNotice').value = scr.notice_period || 'Immediately';
+        document.getElementById('cfgYears').value = scr.years_of_experience || '1';
+        document.getElementById('cfgDomicile').value = scr.domicile || 'Jakarta';
+
+        document.getElementById('cfgTgToken').value = tg.bot_token || '';
+        document.getElementById('cfgTgChat').value = tg.chat_id || '';
+        document.getElementById('cfgTgEnabled').checked = !!tg.enabled;
         
         document.getElementById('activeProfileBadge').innerText = 
           `${prof.field_or_major || 'Umum'} (${prof.experience_level || 'all'})`;
@@ -219,23 +355,40 @@
       }
     }
 
-    async function saveSettings() {
+    async function saveAllSettings() {
       const prof = {
+        applicant_name: document.getElementById('cfgName').value.trim(),
+        contact_info: document.getElementById('cfgContact').value.trim(),
         field_or_major: document.getElementById('cfgMajor').value.trim(),
         target_keywords: document.getElementById('cfgKeywords').value.split(',').map(s => s.trim()).filter(Boolean),
         experience_level: document.getElementById('cfgExp').value,
         blacklist_keywords: document.getElementById('cfgBlacklist').value.split(',').map(s => s.trim()).filter(Boolean)
       };
 
+      const scr = {
+        expected_salary: document.getElementById('cfgSalary').value.trim(),
+        notice_period: document.getElementById('cfgNotice').value.trim(),
+        years_of_experience: document.getElementById('cfgYears').value.trim(),
+        domicile: document.getElementById('cfgDomicile').value.trim(),
+        willing_to_wfo: true,
+        willing_to_relocate: true
+      };
+
+      const tg = {
+        bot_token: document.getElementById('cfgTgToken').value.trim(),
+        chat_id: document.getElementById('cfgTgChat').value.trim(),
+        enabled: document.getElementById('cfgTgEnabled').checked
+      };
+
       try {
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profile: prof })
+          body: JSON.stringify({ profile: prof, screening_defaults: scr, telegram: tg })
         });
         const data = await res.json();
         if (data.success) {
-          alert('Pengaturan profil berhasil disimpan!');
+          alert('Semua pengaturan berhasil disimpan!');
           loadConfig();
         }
       } catch (e) {
@@ -252,7 +405,7 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Sedang Memindai...';
       status.style.display = 'block';
-      status.innerText = `[*] Membuka browser dan memindai lowongan di ${platform.toUpperCase()}... Jendela browser akan terbuka, pastikan kamu sudah login jika diminta.`;
+      status.innerText = `[*] Membuka browser untuk memindai ${platform.toUpperCase()}... Jendela browser akan terbuka. Pastikan login jika diminta.`;
       container.innerHTML = '';
 
       try {
@@ -265,7 +418,7 @@
 
         if (data.success && data.jobs && data.jobs.length > 0) {
           foundJobs = data.jobs;
-          status.innerText = `[✓] Berhasil menemukan ${foundJobs.length} lowongan yang cocok dengan profil kamu!`;
+          status.innerText = `[✓] Ditemukan ${foundJobs.length} lowongan/magang cocok!`;
           renderJobs();
         } else {
           status.innerText = `[-] Tidak ada lowongan baru yang cocok di ${platform.toUpperCase()} saat ini.`;
@@ -294,13 +447,14 @@
             </div>
           </div>
           <div class="job-badges">
-            <span class="badge badge-salary">${job.salary || 'Gaji tidak dicantumkan'}</span>
+            <span class="badge badge-salary">${job.salary || 'Gaji/Uang saku tidak dicantumkan'}</span>
             ${job.location ? `<span class="badge">${job.location}</span>` : ''}
           </div>
           <div class="job-actions">
             <button class="btn btn-success btn-sm" onclick="applyJob(${index})">✅ Lamar Otomatis</button>
+            <button class="btn btn-purple btn-sm" onclick="openCoverLetterModal(${index})">📄 Cover Letter</button>
             <button class="btn btn-secondary btn-sm" onclick="skipJob(${index})">⏭️ Lewati</button>
-            <a href="${job.url}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;">🔗 Buka Link</a>
+            <a href="${job.url}" target="_blank" class="btn btn-secondary btn-sm">🔗 Buka Link</a>
           </div>
         `;
         container.appendChild(card);
@@ -314,7 +468,7 @@
 
       card.style.opacity = '0.5';
       const actions = card.querySelector('.job-actions');
-      actions.innerHTML = '<span style="font-size: 0.85rem; color: var(--primary);">⏳ Sedang mengeksekusi lamaran di browser...</span>';
+      actions.innerHTML = '<span style="font-size: 0.85rem; color: var(--primary);">⏳ Sedang melamar & mengisi auto-screening...</span>';
 
       try {
         const res = await fetch('/api/apply', {
@@ -329,9 +483,9 @@
         });
         const data = await res.json();
         if (data.success && data.result.status === 'success') {
-          actions.innerHTML = '<span style="color: var(--success); font-weight: 600;">[✓] Lamaran Berhasil Dikirim!</span>';
+          actions.innerHTML = '<span style="color: var(--success); font-weight: 600;">[✓] Lamaran Berhasil Terkirim!</span>';
         } else {
-          actions.innerHTML = `<span style="color: var(--warning); font-size: 0.85rem;">[!] ${data.result ? data.result.message : 'Silakan selesaikan di browser'}</span>`;
+          actions.innerHTML = `<span style="color: var(--warning); font-size: 0.85rem;">[!] ${data.result ? data.result.message : 'Selesaikan di browser'}</span>`;
         }
       } catch (e) {
         actions.innerHTML = '<span style="color: var(--danger); font-size: 0.85rem;">[x] Gagal mengirim</span>';
@@ -351,52 +505,142 @@
             url: job.url,
             title: job.title,
             company: job.company,
-            notes: 'Dilewati via Web UI'
+            notes: 'Dilewati via Dashboard'
           })
         });
       } catch (e) {}
     }
 
-    async function loadHistory() {
+    /* KANBAN BOARD LOGIC */
+    async function loadKanban() {
       try {
         const res = await fetch('/api/history');
-        const data = await res.json();
-        const applied = data.applied || [];
-        const skipped = data.skipped || [];
+        const hist = await res.json();
 
-        document.getElementById('statApplied').innerText = applied.length;
-        document.getElementById('statSkipped').innerText = skipped.length;
-
-        const tbody = document.getElementById('historyTableBody');
-        tbody.innerHTML = '';
-
-        applied.slice(-15).reverse().forEach(item => {
-          const row = `<tr>
-            <td class="status-applied">Dilamar</td>
-            <td><a href="${item.url}" target="_blank" style="color:#fff; text-decoration:none;">${item.title || '-'}</a></td>
-            <td>${item.company || '-'}</td>
-            <td>${item.timestamp || '-'}</td>
-            <td>${item.notes || '-'}</td>
-          </tr>`;
-          tbody.innerHTML += row;
-        });
-
-        skipped.slice(-10).reverse().forEach(item => {
-          const row = `<tr>
-            <td class="status-skipped">Dilewati</td>
-            <td><a href="${item.url}" target="_blank" style="color:#94a3b8; text-decoration:none;">${item.title || '-'}</a></td>
-            <td>${item.company || '-'}</td>
-            <td>${item.timestamp || '-'}</td>
-            <td>${item.notes || '-'}</td>
-          </tr>`;
-          tbody.innerHTML += row;
+        const statuses = ['applied', 'interview', 'offering', 'rejected'];
+        statuses.forEach(st => {
+          const items = hist[st] || [];
+          const cap = st.charAt(0).toUpperCase() + st.slice(1);
+          document.getElementById(`count${cap}`).innerText = items.length;
+          
+          const col = document.getElementById(`col${cap}`);
+          col.innerHTML = '';
+          items.slice(-20).reverse().forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'kanban-card';
+            card.innerHTML = `
+              <div class="kanban-card-title">${item.title || 'Posisi'}</div>
+              <div class="kanban-card-company">${item.company || 'Perusahaan'}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${item.timestamp || ''}</div>
+              ${item.notes ? `<div style="font-size: 0.75rem; color: var(--warning); margin-top: 4px;">📌 ${item.notes}</div>` : ''}
+              <select class="kanban-card-select" onchange="moveKanban('${item.url}', this.value)">
+                <option value="applied" ${st === 'applied' ? 'selected' : ''}>Terkirim</option>
+                <option value="interview" ${st === 'interview' ? 'selected' : ''}>Interview</option>
+                <option value="offering" ${st === 'offering' ? 'selected' : ''}>Offering</option>
+                <option value="rejected" ${st === 'rejected' ? 'selected' : ''}>Ditolak</option>
+              </select>
+            `;
+            col.appendChild(card);
+          });
         });
       } catch (e) {
-        console.error('Gagal memuat riwayat:', e);
+        console.error('Gagal memuat kanban:', e);
       }
     }
 
-    // Inisialisasi saat halaman dibuka
+    async function moveKanban(url, newStatus) {
+      const note = prompt('Catatan perkembangan (opsional, misal: Jadwal interview tgl 20 Nov):');
+      try {
+        await fetch('/api/status-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url, status: newStatus, notes: note })
+        });
+        loadKanban();
+      } catch (e) {}
+    }
+
+    /* COVER LETTER MODAL */
+    function openCoverLetterModal(index) {
+      activeCLJob = foundJobs[index];
+      document.getElementById('clTitle').innerText = `📄 Cover Letter: ${activeCLJob.title} @ ${activeCLJob.company}`;
+      regenerateCoverLetter();
+      document.getElementById('coverLetterModal').classList.add('active');
+    }
+
+    async function regenerateCoverLetter() {
+      if (!activeCLJob) return;
+      const preset = document.getElementById('clPreset').value;
+      try {
+        const res = await fetch('/api/cover-letter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: activeCLJob.title, company: activeCLJob.company, preset: preset })
+        });
+        const data = await res.json();
+        document.getElementById('clText').value = data.cover_letter;
+      } catch (e) {}
+    }
+
+    function closeModal() {
+      document.getElementById('coverLetterModal').classList.remove('active');
+    }
+
+    function copyCoverLetter() {
+      const txt = document.getElementById('clText');
+      txt.select();
+      document.execCommand('copy');
+      alert('Surat lamaran berhasil disalin ke clipboard!');
+    }
+
+    /* DIRECT COLD EMAIL */
+    async function generateEmailDraft() {
+      const role = document.getElementById('emailRole').value || 'Staff';
+      const company = document.getElementById('emailCompany').value || 'Perusahaan';
+      const name = document.getElementById('cfgName').value || 'Pelamar';
+
+      document.getElementById('emailSubject').value = `Lamaran Pekerjaan: ${role} - ${name}`;
+      try {
+        const res = await fetch('/api/cover-letter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: role, company: company, preset: 'formal' })
+        });
+        const data = await res.json();
+        document.getElementById('emailBody').value = data.cover_letter;
+      } catch (e) {}
+    }
+
+    async function sendDirectEmail() {
+      const to = document.getElementById('emailTo').value.trim();
+      const sub = document.getElementById('emailSubject').value.trim();
+      const body = document.getElementById('emailBody').value.trim();
+      const statusDiv = document.getElementById('emailStatus');
+
+      if (!to || !sub || !body) {
+        alert('Mohon isi email tujuan, subjek, dan isi email terlebih dahulu.');
+        return;
+      }
+
+      statusDiv.innerHTML = '<span style="color: var(--primary);">⏳ Sedang mengirim email via SMTP...</span>';
+
+      try {
+        const res = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to_email: to, subject: sub, body: body })
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusDiv.innerHTML = `<span style="color: var(--success); font-weight:600;">[✓] ${data.message}</span>`;
+        } else {
+          statusDiv.innerHTML = `<span style="color: var(--danger);">[x] ${data.message}</span>`;
+        }
+      } catch (e) {
+        statusDiv.innerHTML = '<span style="color: var(--danger);">[x] Gagal memanggil endpoint kirim email</span>';
+      }
+    }
+
     loadConfig();
   </script>
 </body>

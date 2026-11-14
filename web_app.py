@@ -9,13 +9,21 @@ from playwright.sync_api import sync_playwright
 from src.browser import get_browser_context
 from src.glints import GlintsHunter
 from src.jobstreet import JobstreetHunter
-from src.storage import load_history, record_job, export_history_to_csv
+from src.maganghub import MagangHubHunter
+from src.storage import load_history, record_job, update_job_status, export_history_to_csv
 from src.config import load_config, save_config
+from src.cover_letter import generate_cover_letter
+from src.email_sender import send_cold_email
+from src.notifier import send_telegram_alert
 
 app = Flask(__name__, template_folder="templates")
-
-# Lock untuk sinkronisasi pemanggilan Playwright agar aman di web server
 playwright_lock = threading.Lock()
+
+HUNTER_MAP = {
+    "glints": (GlintsHunter, "Glints Indonesia"),
+    "jobstreet": (JobstreetHunter, "JobStreet Indonesia"),
+    "maganghub": (MagangHubHunter, "MagangHub Kemnaker")
+}
 
 @app.route("/")
 def index():
@@ -30,14 +38,9 @@ def update_config():
     data = request.json or {}
     cfg = load_config()
     
-    if "profile" in data:
-        cfg["profile"] = data["profile"]
-    if "min_delay_sec" in data:
-        cfg["min_delay_sec"] = data["min_delay_sec"]
-    if "max_delay_sec" in data:
-        cfg["max_delay_sec"] = data["max_delay_sec"]
-    if "auto_skip_already_seen" in data:
-        cfg["auto_skip_already_seen"] = data["auto_skip_already_seen"]
+    for key in ["profile", "screening_defaults", "smtp", "telegram", "min_delay_sec", "max_delay_sec", "auto_skip_already_seen"]:
+        if key in data:
+            cfg[key] = data[key]
         
     save_config(cfg)
     return jsonify({"success": True, "config": cfg})
@@ -48,19 +51,32 @@ def scan_jobs():
     platform = data.get("platform", "glints").lower()
     cfg = load_config()
 
+    hunter_info = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
+    HunterClass, platform_name = hunter_info
+
     with playwright_lock:
         with sync_playwright() as p:
-            # Buka browser untuk scan
             context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
             page = context.new_page()
             
             try:
-                if platform == "jobstreet":
-                    hunter = JobstreetHunter(page, cfg)
-                else:
-                    hunter = GlintsHunter(page, cfg)
-
+                hunter = HunterClass(page, cfg)
                 jobs = hunter.search_jobs()
+
+                # Notifikasi Telegram jika aktif
+                tg_cfg = cfg.get("telegram", {})
+                if tg_cfg.get("enabled", False) and jobs:
+                    for j in jobs[:3]:
+                        send_telegram_alert(
+                            title=j["title"],
+                            company=j["company"],
+                            url=j["url"],
+                            platform=platform_name,
+                            salary=j.get("salary", "Tidak dicantumkan"),
+                            bot_token=tg_cfg.get("bot_token", ""),
+                            chat_id=tg_cfg.get("chat_id", "")
+                        )
+
                 return jsonify({"success": True, "platform": platform, "jobs": jobs})
             except Exception as e:
                 return jsonify({"success": False, "error": str(e)}), 500
@@ -79,6 +95,8 @@ def apply_job():
         return jsonify({"success": False, "error": "URL lowongan wajib disertakan"}), 400
 
     cfg = load_config()
+    hunter_info = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
+    HunterClass, platform_name = hunter_info
 
     with playwright_lock:
         with sync_playwright() as p:
@@ -86,19 +104,15 @@ def apply_job():
             page = context.new_page()
 
             try:
-                if platform == "jobstreet":
-                    hunter = JobstreetHunter(page, cfg)
-                else:
-                    hunter = GlintsHunter(page, cfg)
-
+                hunter = HunterClass(page, cfg)
                 result = hunter.inspect_and_apply(job_url)
 
                 if result["status"] == "success":
-                    record_job(job_url, title, company, status="applied", notes=f"Web UI: {platform.title()}")
+                    record_job(job_url, title, company, status="applied", notes=f"Lamar via {platform_name}")
                 elif result["status"] == "already_applied":
-                    record_job(job_url, title, company, status="applied", notes=f"Sudah dilamar sebelumnya ({platform.title()})")
+                    record_job(job_url, title, company, status="applied", notes=f"Sudah dilamar sebelumnya ({platform_name})")
                 elif result["status"] == "external_link":
-                    record_job(job_url, title, company, status="skipped", notes=f"Tautan eksternal ({platform.title()})")
+                    record_job(job_url, title, company, status="skipped", notes=f"Tautan eksternal ({platform_name})")
 
                 return jsonify({"success": True, "result": result})
             except Exception as e:
@@ -119,6 +133,50 @@ def skip_job():
 
     record_job(job_url, title, company, status="skipped", notes=notes)
     return jsonify({"success": True})
+
+@app.route("/api/status-update", methods=["POST"])
+def update_status():
+    """Mengubah status dalam papan Kanban pelacak lamaran"""
+    data = request.json or {}
+    job_url = data.get("url")
+    new_status = data.get("status")
+    notes = data.get("notes")
+
+    if not job_url or not new_status:
+        return jsonify({"success": False, "error": "URL dan status baru diperlukan"}), 400
+
+    success = update_job_status(job_url, new_status, notes)
+    return jsonify({"success": success})
+
+@app.route("/api/cover-letter", methods=["POST"])
+def get_cover_letter():
+    """Menghasilkan surat lamaran / cover letter instan yang dipersonalisasi"""
+    data = request.json or {}
+    role = data.get("role", "Posisi")
+    company = data.get("company", "Perusahaan")
+    preset = data.get("preset", "formal")
+    
+    cfg = load_config()
+    profile = cfg.get("profile", {})
+    letter = generate_cover_letter(role, company, profile, preset)
+    return jsonify({"success": True, "cover_letter": letter})
+
+@app.route("/api/send-email", methods=["POST"])
+def direct_send_email():
+    """Kirim lamaran langsung ke alamat email HRD via SMTP dengan lampiran CV"""
+    data = request.json or {}
+    to_email = data.get("to_email")
+    subject = data.get("subject")
+    body = data.get("body")
+    
+    cfg = load_config()
+    smtp_cfg = cfg.get("smtp", {})
+    cv_path = smtp_cfg.get("cv_path", "attachments/CV.pdf")
+
+    result = send_cold_email(to_email, subject, body, attachment_path=cv_path, smtp_config=smtp_cfg)
+    if result["success"]:
+        record_job(f"mailto:{to_email}", subject, to_email, status="applied", notes="Cold Email Langsung")
+    return jsonify(result)
 
 @app.route("/api/history", methods=["GET"])
 def get_history():
@@ -141,8 +199,8 @@ def start_server(port=5000, auto_open=True):
             webbrowser.open(f"http://127.0.0.1:{port}")
         threading.Thread(target=open_browser, daemon=True).start()
 
-    print(f"\n[OK] loker-cli Web UI aktif di: http://127.0.0.1:{port}")
-    print("[*] Tekan CTRL+C di terminal ini untuk mematikan server.\n")
+    print(f"\n[OK] loker-cli Web Dashboard aktif di: http://127.0.0.1:{port}")
+    print("[*] Menutup terminal ini akan menghentikan server web.\n")
     app.run(host="127.0.0.1", port=port, debug=False)
 
 if __name__ == "__main__":

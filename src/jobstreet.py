@@ -1,14 +1,15 @@
 import time
-from urllib.parse import quote
 from src.base_hunter import BaseJobHunter
 from src.browser import human_delay
 from src.storage import is_job_recorded, record_job
 from src.matcher import JobMatcher
+from src.screener import ScreeningAutoFiller
 
 class JobstreetHunter(BaseJobHunter):
     def __init__(self, page, config):
         super().__init__(page, config)
         self.matcher = JobMatcher(config.get("profile", {}))
+        self.screener = ScreeningAutoFiller(page, config.get("screening_defaults", {}))
 
     def check_login_status(self) -> bool:
         """Memeriksa apakah sesi login Jobstreet/SEEK aktif"""
@@ -27,7 +28,6 @@ class JobstreetHunter(BaseJobHunter):
             keywords = profile.get("target_keywords", ["Software Engineer"])
 
         main_query = keywords[0] if isinstance(keywords, list) and keywords else str(keywords)
-        # JobStreet URL format: https://id.jobstreet.com/id/{keyword}-jobs
         slug_query = main_query.strip().replace(" ", "-").lower()
         url = f"https://id.jobstreet.com/id/{slug_query}-jobs"
 
@@ -45,12 +45,10 @@ class JobstreetHunter(BaseJobHunter):
 
         jobs = []
 
-        # Scroll sedikit untuk memastikan render elemen dinamis
         for _ in range(2):
             self.page.mouse.wheel(0, 800)
             time.sleep(1)
 
-        # Cari kartu lowongan via data-automation SEEK
         title_elements = self.page.locator("a[data-automation='jobTitle']").all()
         seen_urls = set()
 
@@ -73,7 +71,6 @@ class JobstreetHunter(BaseJobHunter):
 
                 title = title_el.inner_text().strip()
 
-                # Cari elemen parent/container untuk mengambil company dan salary
                 container = title_el.locator("xpath=./ancestor::article").first
                 company = "Perusahaan tidak dicantumkan"
                 salary = "Tidak dicantumkan"
@@ -101,7 +98,6 @@ class JobstreetHunter(BaseJobHunter):
                     except Exception:
                         pass
 
-                # Evaluasi kecocokan dengan profil jurusan & pengalaman
                 is_match, reason = self.matcher.evaluate(title, company, location=location)
                 if not is_match:
                     record_job(clean_url, title, company, status="skipped", notes=f"JobStreet Filter: {reason}")
@@ -120,7 +116,7 @@ class JobstreetHunter(BaseJobHunter):
         return jobs
 
     def inspect_and_apply(self, job_url: str) -> dict:
-        """Membuka halaman detail loker JobStreet dan mengeksekusi proses lamaran"""
+        """Membuka halaman detail loker JobStreet dan mengeksekusi proses lamaran dengan auto-screening"""
         try:
             self.page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
             human_delay(1.5, 2.5)
@@ -151,8 +147,10 @@ class JobstreetHunter(BaseJobHunter):
             apply_btn.click()
             human_delay(2, 3)
 
-            # Cek modal lamaran JobStreet / pertanyaan screening
-            # JobStreet sering meminta review CV atau menjawab form khusus
+            # 3. Auto-fill kuesioner screening jika ada
+            self.screener.auto_fill_form()
+            human_delay(1, 2)
+
             submit_btn = self.page.locator("button:has-text('Kirim lamaran'), button:has-text('Kirim'), button[data-automation='submit-application']").first
             if submit_btn.is_visible(timeout=3000):
                 submit_btn.click()

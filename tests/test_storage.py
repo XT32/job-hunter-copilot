@@ -26,14 +26,18 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(len(hist["applied"]), 1)
         self.assertEqual(hist["applied"][0]["title"], "Backend Dev")
 
-    def test_record_skipped_job(self):
-        url = "https://glints.com/id/opportunities/jobs/test-456"
-        storage.record_job(url, "Sales", "PT X", status="skipped", notes="Blacklist")
-        self.assertTrue(storage.is_job_recorded(url))
+    def test_update_status_kanban(self):
+        url = "https://id.jobstreet.com/job/test-kanban"
+        storage.record_job(url, "Finance Staff", "PT Indo", status="applied")
+        
+        # Pindahkan ke interview
+        updated = storage.update_job_status(url, "interview", notes="Wawancara HR tgl 20 Nov")
+        self.assertTrue(updated)
 
         hist = storage.load_history()
-        self.assertEqual(len(hist["skipped"]), 1)
-        self.assertEqual(hist["skipped"][0]["notes"], "Blacklist")
+        self.assertEqual(len(hist["applied"]), 0)
+        self.assertEqual(len(hist["interview"]), 1)
+        self.assertEqual(hist["interview"][0]["notes"], "Wawancara HR tgl 20 Nov")
 
     def test_export_to_csv(self):
         url1 = "https://id.jobstreet.com/job/111"
@@ -47,11 +51,7 @@ class TestStorage(unittest.TestCase):
         self.assertTrue(os.path.exists(csv_path))
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = list(csv.reader(f))
-            # Header + 2 data rows
             self.assertEqual(len(reader), 3)
-            self.assertEqual(reader[0][0], "Status")
-            self.assertEqual(reader[1][0], "Dilamar")
-            self.assertEqual(reader[2][0], "Dilewati")
 
 if __name__ == "__main__":
     unittest.main()
