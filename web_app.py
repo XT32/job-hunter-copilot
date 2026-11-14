@@ -12,13 +12,15 @@ from src.glints import GlintsHunter
 from src.jobstreet import JobstreetHunter
 from src.maganghub import MagangHubHunter
 from src.dealls import DeallsHunter
-from src.storage import load_history, record_job, update_job_status, export_history_to_csv, HISTORY_FILE
+from src.storage import load_history, record_job, update_job_status, export_history_to_csv, get_analytics_summary, HISTORY_FILE
 from src.config import load_config, save_config, DEFAULT_CONFIG_PATH
 from src.cover_letter import generate_cover_letter
 from src.email_sender import send_cold_email
 from src.notifier import send_telegram_alert
 from src.cv_analyzer import extract_text_from_pdf, calculate_ats_match
 from src.scheduler import AutoHuntScheduler
+from src.scam_detector import check_for_red_flags
+from src.salary_guide import suggest_salary_range, get_umr_by_location, evaluate_candidate_salary
 
 app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # Maksimal 10 MB untuk upload CV
@@ -30,7 +32,22 @@ def request_entity_too_large(error):
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "attachments")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-CV_FILE_PATH = os.path.join(UPLOAD_FOLDER, "CV.pdf")
+DEFAULT_CV_PATH = os.path.join(UPLOAD_FOLDER, "CV.pdf")
+
+# In-Memory Ring Buffer untuk Live Activity Log (100 log terakhir)
+MAX_LOGS = 100
+system_logs = []
+logs_lock = threading.Lock()
+
+def add_log(message: str, level: str = "info"):
+    with logs_lock:
+        system_logs.append({
+            "time": time.strftime("%H:%M:%S"),
+            "message": message,
+            "level": level
+        })
+        if len(system_logs) > MAX_LOGS:
+            system_logs.pop(0)
 
 HUNTER_MAP = {
     "glints": (GlintsHunter, "Glints Indonesia"),
@@ -54,16 +71,38 @@ def update_config():
     data = request.json or {}
     cfg = load_config()
     
-    for key in ["profile", "screening_defaults", "smtp", "telegram", "min_delay_sec", "max_delay_sec", "auto_skip_already_seen"]:
+    for key in ["profile", "screening_defaults", "smtp", "telegram", "active_cv", "min_delay_sec", "max_delay_sec", "auto_skip_already_seen"]:
         if key in data:
             cfg[key] = data[key]
         
     save_config(cfg)
+    add_log("Pengaturan profil & kriteria loker diperbarui.", "info")
     return jsonify({"success": True, "config": cfg})
+
+# ================= MULTI-CV ENDPOINTS =================
+@app.route("/api/cvs", methods=["GET"])
+def list_cvs():
+    cfg = load_config()
+    active_cv = cfg.get("active_cv", "CV.pdf")
+    cv_files = []
+    
+    if os.path.exists(UPLOAD_FOLDER):
+        for f in os.listdir(UPLOAD_FOLDER):
+            if f.lower().endswith(".pdf") and not f.startswith("."):
+                p = os.path.join(UPLOAD_FOLDER, f)
+                cv_files.append({
+                    "filename": f,
+                    "size": os.path.getsize(p),
+                    "active": (f == active_cv)
+                })
+    
+    # Urutkan abjad
+    cv_files.sort(key=lambda x: x["filename"])
+    return jsonify({"cvs": cv_files, "active_cv": active_cv})
 
 @app.route("/api/upload-cv", methods=["POST"])
 def upload_cv():
-    """Menerima unggahan file PDF CV pengguna dan mengekstrak teksnya"""
+    """Menerima unggahan file PDF CV pengguna dan menetapkannya sebagai CV aktif"""
     if "cv" not in request.files:
         return jsonify({"success": False, "error": "Tidak ada file yang diunggah"}), 400
 
@@ -71,22 +110,79 @@ def upload_cv():
     if file.filename == "" or not file.filename.lower().endswith(".pdf"):
         return jsonify({"success": False, "error": "File harus berformat PDF"}), 400
 
-    file.save(CV_FILE_PATH)
-    text = extract_text_from_pdf(CV_FILE_PATH)
+    raw_filename = secure_filename(file.filename)
+    if not raw_filename:
+        raw_filename = f"CV_{int(time.time())}.pdf"
 
-    # Simpan path CV ke config SMTP
+    target_path = os.path.join(UPLOAD_FOLDER, raw_filename)
+    file.save(target_path)
+    text = extract_text_from_pdf(target_path)
+
+    # Tetapkan sebagai active_cv
     cfg = load_config()
+    cfg["active_cv"] = raw_filename
     if "smtp" not in cfg:
         cfg["smtp"] = {}
-    cfg["smtp"]["cv_path"] = CV_FILE_PATH
+    cfg["smtp"]["cv_path"] = target_path
     save_config(cfg)
+
+    add_log(f"CV '{raw_filename}' berhasil diunggah ({len(text)} karakter terbaca).", "success")
 
     return jsonify({
         "success": True,
-        "message": "File CV berhasil disimpan!",
+        "filename": raw_filename,
+        "message": f"File CV '{raw_filename}' berhasil disimpan sebagai CV aktif!",
         "has_text": len(text) > 20,
         "char_count": len(text)
     })
+
+@app.route("/api/set-active-cv", methods=["POST"])
+def set_active_cv():
+    data = request.json or {}
+    filename = data.get("filename", "")
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(UPLOAD_FOLDER, safe_name)
+
+    if not safe_name or not os.path.exists(file_path):
+        return jsonify({"success": False, "error": "File CV tidak ditemukan"}), 404
+
+    cfg = load_config()
+    cfg["active_cv"] = safe_name
+    if "smtp" not in cfg:
+        cfg["smtp"] = {}
+    cfg["smtp"]["cv_path"] = file_path
+    save_config(cfg)
+
+    add_log(f"CV aktif dialihkan ke '{safe_name}'.", "info")
+    return jsonify({"success": True, "active_cv": safe_name})
+
+@app.route("/api/delete-cv", methods=["POST"])
+def delete_cv():
+    data = request.json or {}
+    filename = data.get("filename", "")
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(UPLOAD_FOLDER, safe_name)
+
+    if not safe_name or not os.path.exists(file_path):
+        return jsonify({"success": False, "error": "File tidak ditemukan"}), 404
+
+    try:
+        os.remove(file_path)
+        cfg = load_config()
+        if cfg.get("active_cv") == safe_name:
+            remaining = [f for f in os.listdir(UPLOAD_FOLDER) if f.lower().endswith(".pdf")]
+            cfg["active_cv"] = remaining[0] if remaining else ""
+            save_config(cfg)
+        add_log(f"File CV '{safe_name}' dihapus.", "info")
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ================= LIVE LOGS & SCANNING =================
+@app.route("/api/logs", methods=["GET"])
+def get_logs():
+    with logs_lock:
+        return jsonify(list(system_logs))
 
 @app.route("/api/scan", methods=["POST"])
 def scan_jobs():
@@ -97,8 +193,12 @@ def scan_jobs():
     hunter_info = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
     HunterClass, platform_name = hunter_info
 
-    # Ekstrak teks CV untuk kalkulasi ATS Match Score
-    cv_text = extract_text_from_pdf(CV_FILE_PATH) if os.path.exists(CV_FILE_PATH) else ""
+    # Tentukan file CV yang sedang aktif untuk ATS scoring
+    active_cv = cfg.get("active_cv", "CV.pdf")
+    active_cv_path = os.path.join(UPLOAD_FOLDER, active_cv)
+    cv_text = extract_text_from_pdf(active_cv_path) if os.path.exists(active_cv_path) else ""
+
+    add_log(f"Menyiapkan browser untuk pemindaian di {platform_name}...", "info")
 
     with playwright_lock:
         with sync_playwright() as p:
@@ -106,12 +206,21 @@ def scan_jobs():
             page = context.new_page()
             
             try:
+                add_log(f"Membuka portal {platform_name} dan mencari lowongan sesuai profil...", "info")
                 hunter = HunterClass(page, cfg)
                 jobs = hunter.search_jobs()
 
-                # Tambahkan skor ATS ke setiap pekerjaan
+                add_log(f"Ditemukan {len(jobs)} lowongan cocok di {platform_name}. Menjalankan evaluasi ATS & deteksi penipuan...", "info")
+
+                # Tambahkan skor ATS dan Deteksi Zonk / Red Flag ke setiap pekerjaan
                 for j in jobs:
                     j["ats"] = calculate_ats_match(cv_text, j["title"], j.get("company", ""))
+                    j["red_flag"] = check_for_red_flags(
+                        title=j["title"],
+                        company=j["company"],
+                        description=j.get("description", ""),
+                        location=j.get("location", "")
+                    )
 
                 # Notifikasi Telegram jika aktif
                 tg_cfg = cfg.get("telegram", {})
@@ -127,8 +236,10 @@ def scan_jobs():
                             chat_id=tg_cfg.get("chat_id", "")
                         )
 
-                return jsonify({"success": True, "platform": platform, "jobs": jobs, "has_cv": bool(cv_text)})
+                add_log(f"Pemindaian {platform_name} selesai. Menampilkan {len(jobs)} hasil.", "success")
+                return jsonify({"success": True, "platform": platform, "jobs": jobs, "has_cv": bool(cv_text), "active_cv": active_cv})
             except Exception as e:
+                add_log(f"Gagal saat memindai {platform_name}: {str(e)}", "danger")
                 return jsonify({"success": False, "error": str(e)}), 500
             finally:
                 context.close()
@@ -148,6 +259,8 @@ def apply_job():
     hunter_info = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
     HunterClass, platform_name = hunter_info
 
+    add_log(f"Membuka proses melamar untuk '{title}' di {company} ({platform_name})...", "info")
+
     with playwright_lock:
         with sync_playwright() as p:
             context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
@@ -159,13 +272,17 @@ def apply_job():
 
                 if result["status"] == "success":
                     record_job(job_url, title, company, status="applied", notes=f"Lamar via {platform_name}")
+                    add_log(f"Lamaran '{title}' di {company} berhasil terkirim!", "success")
                 elif result["status"] == "already_applied":
                     record_job(job_url, title, company, status="applied", notes=f"Sudah dilamar sebelumnya ({platform_name})")
+                    add_log(f"Lowongan '{title}' di {company} ternyata sudah pernah dilamar.", "warning")
                 elif result["status"] == "external_link":
                     record_job(job_url, title, company, status="skipped", notes=f"Tautan eksternal ({platform_name})")
+                    add_log(f"Lowongan '{title}' di {company} dialihkan ke web karir eksternal.", "info")
 
                 return jsonify({"success": True, "result": result})
             except Exception as e:
+                add_log(f"Kendala melamar '{title}': {str(e)}", "danger")
                 return jsonify({"success": False, "error": str(e)}), 500
             finally:
                 context.close()
@@ -182,6 +299,7 @@ def skip_job():
         return jsonify({"success": False, "error": "URL wajib diisi"}), 400
 
     record_job(job_url, title, company, status="skipped", notes=notes)
+    add_log(f"Lowongan '{title}' di {company} dilewati.", "info")
     return jsonify({"success": True})
 
 @app.route("/api/status-update", methods=["POST"])
@@ -195,6 +313,8 @@ def update_status():
         return jsonify({"success": False, "error": "URL dan status baru diperlukan"}), 400
 
     success = update_job_status(job_url, new_status, notes)
+    if success:
+        add_log(f"Status lamaran diperbarui ke '{new_status}'.", "info")
     return jsonify({"success": success})
 
 @app.route("/api/cover-letter", methods=["POST"])
@@ -218,12 +338,29 @@ def direct_send_email():
     
     cfg = load_config()
     smtp_cfg = cfg.get("smtp", {})
-    cv_path = smtp_cfg.get("cv_path", CV_FILE_PATH)
+    active_cv = cfg.get("active_cv", "CV.pdf")
+    cv_path = smtp_cfg.get("cv_path") or os.path.join(UPLOAD_FOLDER, active_cv)
 
     result = send_cold_email(to_email, subject, body, attachment_path=cv_path, smtp_config=smtp_cfg)
     if result["success"]:
-        record_job(f"mailto:{to_email}", subject, to_email, status="applied", notes="Cold Email Langsung")
+        record_job(f"mailto:{to_email}", subject, to_email, status="applied", notes="Cold Email Langsung via SMTP")
+        add_log(f"Cold email berhasil terkirim ke {to_email} via SMTP.", "success")
+    else:
+        add_log(f"Gagal mengirim email via SMTP ke {to_email}: {result.get('message')}", "danger")
     return jsonify(result)
+
+# ================= SALARY GUIDE & ANALYTICS =================
+@app.route("/api/salary-guide", methods=["GET"])
+def salary_guide():
+    location = request.args.get("location", "Jakarta")
+    exp = request.args.get("exp", "fresh_graduate")
+    guide = suggest_salary_range(location, exp)
+    return jsonify(guide)
+
+@app.route("/api/analytics", methods=["GET"])
+def get_analytics():
+    stats = get_analytics_summary()
+    return jsonify(stats)
 
 @app.route("/api/scheduler", methods=["GET", "POST"])
 def handle_scheduler():
@@ -232,8 +369,10 @@ def handle_scheduler():
         action = data.get("action")
         if action == "start":
             scheduler.start(interval_minutes=int(data.get("interval", 120)))
+            add_log("Background scheduler diaktifkan.", "info")
         else:
             scheduler.stop()
+            add_log("Background scheduler dihentikan.", "info")
     return jsonify(scheduler.get_status())
 
 @app.route("/api/history", methods=["GET"])
@@ -243,6 +382,7 @@ def get_history():
 @app.route("/api/export", methods=["GET"])
 def export_csv():
     csv_file = export_history_to_csv()
+    add_log("Rekap riwayat diekspor ke format CSV.", "info")
     return send_file(
         csv_file,
         mimetype="text/csv",
@@ -261,6 +401,7 @@ def download_backup():
     backup_path = os.path.join(os.path.dirname(__file__), "data", "backup_loker_cli.json")
     with open(backup_path, "w", encoding="utf-8") as f:
         json.dump(backup_data, f, indent=2, ensure_ascii=False)
+    add_log("Cadangan data JSON diunduh pengguna.", "info")
     return send_file(backup_path, mimetype="application/json", as_attachment=True, download_name="backup_loker_cli.json")
 
 def start_server(port=5000, auto_open=True):
@@ -270,6 +411,7 @@ def start_server(port=5000, auto_open=True):
             webbrowser.open(f"http://127.0.0.1:{port}")
         threading.Thread(target=open_browser, daemon=True).start()
 
+    add_log(f"Server dashboard aktif di port {port}.", "success")
     print(f"\n[OK] loker-cli Web Dashboard aktif di: http://127.0.0.1:{port}")
     print("[*] Menutup terminal ini akan menghentikan server web.\n")
     app.run(host="127.0.0.1", port=port, debug=False)

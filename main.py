@@ -1,5 +1,7 @@
 import os
 import sys
+import urllib.parse
+import webbrowser
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -12,10 +14,12 @@ from src.glints import GlintsHunter
 from src.jobstreet import JobstreetHunter
 from src.maganghub import MagangHubHunter
 from src.dealls import DeallsHunter
-from src.storage import record_job, load_history, update_job_status, export_history_to_csv
+from src.storage import record_job, load_history, update_job_status, export_history_to_csv, get_analytics_summary
 from src.config import load_config, save_config
 from src.cover_letter import generate_cover_letter
 from src.email_sender import send_cold_email
+from src.scam_detector import check_for_red_flags
+from src.salary_guide import suggest_salary_range, get_umr_by_location
 
 console = Console()
 
@@ -44,7 +48,7 @@ def print_header():
     exp = profile.get("experience_level", "all")
     major = profile.get("field_or_major", "-")
 
-    console.print("\n[bold white]loker-cli[/bold white] [dim]v1.4.0 — Multi-Platform Career & Internship Assistant[/dim]")
+    console.print("\n[bold white]loker-cli[/bold white] [dim]v1.5.0 — Multi-Platform Career & Internship Assistant[/dim]")
     console.print(f"[dim]Profil: [cyan]{major}[/cyan] ({exp}) | Target: [cyan]{keywords}[/cyan][/dim]")
     console.print("[dim]" + "─" * 72 + "[/dim]\n")
 
@@ -72,6 +76,14 @@ def run_hunter_session(HunterClass, platform_name):
             console.print(f"[green][+] Ditemukan {len(jobs)} lowongan cocok di {platform_name}.[/green]\n")
 
             for idx, job in enumerate(jobs, start=1):
+                # Deteksi penipuan / red flag
+                red_flag = check_for_red_flags(
+                    title=job["title"],
+                    company=job["company"],
+                    description=job.get("description", ""),
+                    location=job.get("location", "")
+                )
+
                 info_text = (
                     f"[bold white]{job['title']}[/bold white]\n"
                     f"Perusahaan : {job['company']}\n"
@@ -79,6 +91,15 @@ def run_hunter_session(HunterClass, platform_name):
                     f"Tautan     : {job['url']}"
                 )
                 console.print(Panel(info_text, title=f"Lowongan {idx}/{len(jobs)} ({platform_name})", expand=False))
+
+                if red_flag["is_red_flag"]:
+                    border_style = "red" if red_flag["risk_level"] == "danger" else "yellow"
+                    flag_text = (
+                        f"[bold red]⚠️ PERINGATAN POTENSI RED FLAG:[/bold red]\n"
+                        f"• {chr(10).join('• ' + f for f in red_flag['flags'])}\n"
+                        f"[dim]{red_flag['advice']}[/dim]"
+                    )
+                    console.print(Panel(flag_text, border_style=border_style, expand=False))
 
                 choice = Prompt.ask(
                     "Pilihan ([bold green]y[/bold green]=Lamar, [bold yellow]s[/bold yellow]=Lewati, [bold cyan]o[/bold cyan]=Buka detail, [bold magenta]c[/bold magenta]=Cover Letter, [bold red]q[/bold red]=Berhenti)",
@@ -118,19 +139,13 @@ def run_hunter_session(HunterClass, platform_name):
 
                 if result["status"] == "success":
                     record_job(job["url"], job["title"], job["company"], status="applied", notes=f"Sukses ({platform_name})")
-                    console.print("[green][OK] Lamaran terkirim.[/green]\n")
-                
-                elif result["status"] == "manual_action_needed":
-                    console.print(f"[yellow][!] {result['message']}[/yellow]")
-                    Prompt.ask("Selesaikan pengisian di layar browser, lalu tekan ENTER di sini")
-                    record_job(job["url"], job["title"], job["company"], status="applied", notes=f"Diselesaikan manual ({platform_name})")
-                    console.print("[green][OK] Dicatat ke riwayat.[/green]\n")
-
+                    console.print(f"[bold green][OK] Berhasil melamar pekerjaan ini.[/bold green]\n")
+                elif result["status"] == "already_applied":
+                    record_job(job["url"], job["title"], job["company"], status="applied", notes="Sudah pernah dilamar")
+                    console.print(f"[yellow][!] Kamu sudah pernah melamar lowongan ini sebelumnya.[/yellow]\n")
                 elif result["status"] == "external_link":
-                    console.print(f"[yellow][!] {result['message']}[/yellow]")
-                    record_job(job["url"], job["title"], job["company"], status="skipped", notes=f"Link eksternal ({platform_name})")
-                    console.print("[dim][-] Dicatat sebagai tautan eksternal.[/dim]\n")
-
+                    record_job(job["url"], job["title"], job["company"], status="skipped", notes="Website karir eksternal")
+                    console.print(f"[cyan][i] Lowongan mengarahkan ke website eksternal perusahaan.[/cyan]\n")
                 else:
                     console.print(f"[red][ERR] {result['message']}[/red]\n")
 
@@ -153,71 +168,89 @@ def direct_email_menu():
     subject = f"Lamaran Pekerjaan: {role} - {profile.get('applicant_name', 'Pelamar')}"
 
     body = generate_cover_letter(role, company, profile, preset="formal")
-    console.print("\n[bold]Isi Email yang Akan Dikirim:[/bold]")
+    console.print("\n[bold]Isi Surat Lamaran:[/bold]")
     console.print(Panel(body, title=subject, expand=False))
 
-    if Confirm.ask("Kirim email sekarang beserta CV?"):
+    console.print("\n[1] Buka Draft di [bold cyan]Gmail Web[/bold cyan] (1-Klik di Browser - Sangat Mudah)")
+    console.print("[2] Buka di Aplikasi Email Default ([bold magenta]Mailto[/bold magenta])")
+    console.print("[3] Kirim Otomatis via SMTP Pribadi")
+    console.print("[4] Batal")
+
+    opt = Prompt.ask("Pilih metode pengiriman", choices=["1", "2", "3", "4"], default="1")
+    if opt == "1":
+        gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={urllib.parse.quote(to_email)}&su={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+        console.print("[*] Membuka draf di browser Gmail kamu...")
+        webbrowser.open(gmail_url)
+        record_job(f"mailto:{to_email}", role, company, status="applied", notes="Draft Gmail Web")
+        console.print("[green][OK] Tab Gmail terbuka! Tinggal lampirkan CV dan kirim.[/green]")
+
+    elif opt == "2":
+        mailto_url = f"mailto:{to_email}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+        webbrowser.open(mailto_url)
+        record_job(f"mailto:{to_email}", role, company, status="applied", notes="Mailto App")
+        console.print("[green][OK] Aplikasi email default dibuka.[/green]")
+
+    elif opt == "3":
         cv_path = smtp_cfg.get("cv_path", "attachments/CV.pdf")
         res = send_cold_email(to_email, subject, body, attachment_path=cv_path, smtp_config=smtp_cfg)
         if res["success"]:
-            record_job(f"mailto:{to_email}", role, company, status="applied", notes="Cold Email Langsung")
+            record_job(f"mailto:{to_email}", role, company, status="applied", notes="Cold Email Langsung (SMTP)")
             console.print(f"[green][OK] {res['message']}[/green]\n")
         else:
             console.print(f"[red][x] {res['message']}[/red]\n")
 
 def kanban_menu():
-    hist = load_history()
-    applied = hist.get("applied", [])
-    interview = hist.get("interview", [])
-    offering = hist.get("offering", [])
-    rejected = hist.get("rejected", [])
+    stats = get_analytics_summary()
+    table = Table(title="Statistik Pelacak Lamaran Kerja (Pipeline)", expand=False)
+    table.add_column("Status Tahapan", style="bold")
+    table.add_column("Jumlah", justify="center")
 
-    table = Table(title="Papan Pelacak Lamaran (Pipeline)", show_header=True)
-    table.add_column("Status", style="bold")
-    table.add_column("Jumlah", style="cyan")
-    table.add_column("Keterangan", style="dim")
-
-    table.add_row("[green]Terkirim (Applied)[/green]", str(len(applied)), "Lamaran berhasil terkirim")
-    table.add_row("[yellow]Interview[/yellow]", str(len(interview)), "Mendapat panggilan wawancara")
-    table.add_row("[bold green]Offering[/bold green]", str(len(offering)), "Menerima tawaran pekerjaan")
-    table.add_row("[red]Ditolak[/red]", str(len(rejected)), "Tidak lolos seleksi")
+    table.add_row("📨 Terkirim (Applied)", str(stats["applied"]))
+    table.add_row("💬 Panggilan Interview", f"[yellow]{stats['interview']}[/yellow]")
+    table.add_row("🏆 Offering / Diterima", f"[bold green]{stats['offering']}[/bold green]")
+    table.add_row("❌ Ditolak / Gugur", f"[red]{stats['rejected']}[/red]")
+    table.add_row("⏭️ Dilewati", str(stats["skipped"]))
+    table.add_row("📈 Tingkat Respons (Interview Rate)", f"[bold cyan]{stats['response_rate']}%[/bold cyan]")
 
     console.print(table)
-
-    if Confirm.ask("\nPerbarui status salah satu lamaran?"):
-        target_url = Prompt.ask("Masukkan URL / Email lamaran yang ingin diubah")
-        new_stat = Prompt.ask("Status baru", choices=["applied", "interview", "offering", "rejected"])
-        notes = Prompt.ask("Catatan perkembangan")
-        if update_job_status(target_url, new_stat, notes):
-            console.print("[green][OK] Status berhasil diperbarui![/green]\n")
-        else:
-            console.print("[red][x] URL tidak ditemukan dalam riwayat.[/red]\n")
-
-    if Confirm.ask("Unduh seluruh riwayat ke file CSV/Excel?"):
-        path = export_history_to_csv()
-        console.print(f"[green][OK] File diekspor ke: {path}[/green]\n")
+    
+    if Confirm.ask("\nApakah kamu ingin mengekspor seluruh riwayat ke file CSV/Excel?"):
+        p = export_history_to_csv()
+        console.print(f"[green][OK] Data berhasil diekspor ke: {p}[/green]")
 
 def settings_menu():
     cfg = load_config()
     profile = cfg.get("profile", {})
     screening = cfg.get("screening_defaults", {})
+    domicile = screening.get("domicile", "Jakarta")
+    exp = profile.get("experience_level", "fresh_graduate")
+
+    umr_guide = suggest_salary_range(domicile, exp)
     
     console.print("\n[bold]Pengaturan Profil & Auto-Fill Screening:[/bold]")
     console.print(f"1. Bidang/Jurusan      : [cyan]{profile.get('field_or_major', '-')}[/cyan]")
     console.print(f"2. Kata Kunci Target   : [cyan]{', '.join(profile.get('target_keywords', []))}[/cyan]")
-    console.print(f"3. Level Pengalaman    : [cyan]{profile.get('experience_level', 'all')}[/cyan]")
-    console.print(f"4. Ekspektasi Gaji     : [cyan]Rp {screening.get('expected_salary', '6000000')}[/cyan]")
+    console.print(f"3. Level Pengalaman    : [cyan]{exp}[/cyan]")
+    console.print(f"4. Domisili & Standar  : [cyan]{domicile}[/cyan] (UMR: Rp {umr_guide['umr']:,})".replace(",", "."))
+    console.print(f"5. Rekomendasi Gaji    : [green]{umr_guide['formatted_range']}[/green]")
+    console.print(f"6. Ekspektasi Kamu     : [cyan]Rp {screening.get('expected_salary', '6000000')}[/cyan]")
 
     if Confirm.ask("\nApakah kamu ingin mengubah data profil ini?"):
         major = Prompt.ask("Bidang/jurusan kamu", default=profile.get("field_or_major", "Akuntansi"))
         keywords_input = Prompt.ask("Kata kunci target (pisahkan koma)", default=", ".join(profile.get("target_keywords", ["Staff"])))
-        exp = Prompt.ask("Level pengalaman", choices=["fresh_graduate", "junior", "mid", "senior", "all"], default=profile.get("experience_level", "junior"))
-        salary = Prompt.ask("Ekspektasi gaji default (angka)", default=str(screening.get("expected_salary", "6000000")))
+        exp = Prompt.ask("Level pengalaman", choices=["fresh_graduate", "junior", "mid", "senior", "all"], default=profile.get("experience_level", "fresh_graduate"))
+        dom = Prompt.ask("Kota domisili kamu", default=domicile)
+        
+        # Hitung UMR kota input
+        new_guide = suggest_salary_range(dom, exp)
+        console.print(f"[dim]Rekomendasi gaji sehat di {dom}: {new_guide['formatted_range']}[/dim]")
+        salary = Prompt.ask("Ekspektasi gaji default (angka)", default=str(new_guide["recommended_min"]))
 
         profile["field_or_major"] = major
         profile["target_keywords"] = [k.strip() for k in keywords_input.split(",") if k.strip()]
         profile["experience_level"] = exp
         screening["expected_salary"] = salary
+        screening["domicile"] = dom
         
         cfg["profile"] = profile
         cfg["screening_defaults"] = screening
@@ -232,9 +265,9 @@ def main():
         console.print("[2] Review & Lamar di [bold magenta]JobStreet Indonesia (SEEK)[/bold magenta]")
         console.print("[3] Cari Program Magang di [bold green]MagangHub Kemnaker[/bold green]")
         console.print("[4] Review & Lamar di [bold yellow]Dealls Jobs Indonesia[/bold yellow]")
-        console.print("[5] Kirim Lamaran Langsung ke Email HRD (Cold Email)")
-        console.print("[6] Pelacak Lamaran (Pipeline Status & Ekspor CSV)")
-        console.print("[7] Atur Profil & Gaji Default")
+        console.print("[5] Kirim Lamaran Langsung ke Email HRD (1-Click Gmail Draft / SMTP)")
+        console.print("[6] Pelacak Lamaran (Pipeline Status, Analytics & Ekspor CSV)")
+        console.print("[7] Atur Profil & Panduan Gaji UMR")
         console.print("[8] Keluar")
         
         choice = Prompt.ask("\nPilih menu", choices=["1", "2", "3", "4", "5", "6", "7", "8"], default="1")

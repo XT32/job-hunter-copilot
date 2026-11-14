@@ -116,3 +116,46 @@ def export_history_to_csv(export_path=DEFAULT_CSV_EXPORT) -> str:
                 ])
 
     return export_path
+
+def get_analytics_summary(hist=None) -> dict:
+    """Menghitung metrik performa pelamaran kerja dari riwayat pipeline"""
+    if hist is None:
+        hist = load_history()
+
+    applied_count = len(hist.get("applied", []))
+    interview_count = len(hist.get("interview", []))
+    offering_count = len(hist.get("offering", []))
+    rejected_count = len(hist.get("rejected", []))
+    skipped_count = len(hist.get("skipped", []))
+
+    total_submitted = applied_count + interview_count + offering_count + rejected_count
+    response_rate = round(((interview_count + offering_count) / total_submitted * 100), 1) if total_submitted > 0 else 0.0
+
+    platforms = {"glints": 0, "jobstreet": 0, "maganghub": 0, "dealls": 0, "email": 0, "lainnya": 0}
+    for s in ["applied", "interview", "offering", "rejected"]:
+        for item in hist.get(s, []):
+            url = item.get("url", "").lower()
+            if "glints.com" in url:
+                platforms["glints"] += 1
+            elif "jobstreet" in url:
+                platforms["jobstreet"] += 1
+            elif "maganghub" in url or "kemnaker" in url:
+                platforms["maganghub"] += 1
+            elif "dealls.com" in url:
+                platforms["dealls"] += 1
+            elif "mailto:" in url or "@" in url:
+                platforms["email"] += 1
+            else:
+                platforms["lainnya"] += 1
+
+    return {
+        "applied": applied_count,
+        "interview": interview_count,
+        "offering": offering_count,
+        "rejected": rejected_count,
+        "skipped": skipped_count,
+        "total_submitted": total_submitted,
+        "response_rate": response_rate,
+        "platforms": platforms
+    }
+

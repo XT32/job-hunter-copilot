@@ -32,22 +32,34 @@ Bagi kamu yang **tidak paham Git** atau **tidak punya Git di komputer**:
 - **MagangHub Kemnaker** (Program Pemagangan Nasional resmi Kementerian Ketenagakerjaan RI).
 - **Dealls Jobs Indonesia** (Pilihan posisi full-time, part-time & internship terkemuka).
 
-### 2. Pengecekan Skor Kecocokan ATS (`src/cv_analyzer.py`)
-- Unggah file PDF CV kamu langsung di Web Dashboard.
-- Sistem mengekstrak keahlian dan mengalkulasi persentase kecocokan ATS (Applicant Tracking System) secara langsung pada setiap kartu lowongan yang ditemukan.
+### 2. Detektor Lowongan Zonk & Tahan Ijazah (`src/scam_detector.py`)
+Menganalisis teks lowongan secara heuristik lokal untuk melindungi pencari kerja dari modus penipuan:
+- ⚠️ Deteksi **klausul tahan ijazah asli** & denda penalti tidak wajar.
+- ⚠️ Deteksi **permintaan pungutan uang** (biaya formulir, uang seragam, tes kesehatan/psikotes berbayar, agen tiket travel).
+- ⚠️ Deteksi **perusahaan pialang berjangka / futures / forex** terselubung.
+- ⚠️ Deteksi modus interview fiktif di titik rawan (ruko Senen, Harmoni, dll).
 
-### 3. Auto-Fill Pertanyaan Screening (`src/screener.py`)
+### 3. Pengelolaan Banyak CV (Multi-CV) & Skor Kecocokan ATS (`src/cv_analyzer.py`)
+- Unggah dan kelola beberapa variasi CV (misal: versi IT, Administrasi, Desain).
+- Tetapkan salah satu sebagai **CV Aktif** dengan 1 klik.
+- Sistem mengekstrak keahlian dan mengalkulasi persentase kecocokan ATS (*Applicant Tracking System*) secara langsung pada setiap kartu lowongan yang ditemukan.
+
+### 4. Panduan Standar Gaji & Rekomendasi UMR 2024/2025 (`src/salary_guide.py`)
+- Dilengkapi database Upah Minimum Regional/Kota (UMR/UMK) resmi untuk kota-kota utama (DKI Jakarta, Surabaya, Bandung, Semarang, Karawang, Bekasi, Yogyakarta, Medan, dll).
+- Memberikan rekomendasi rentang gaji yang sehat sesuai jenjang pengalaman (*Fresh Graduate*, *Junior*, *Internship*) agar pelamar tidak memasukkan angka di bawah standar upah.
+
+### 5. Auto-Fill Pertanyaan Screening (`src/screener.py`)
 Mendeteksi dan mengisi otomatis kuesioner umum saat pop-up lamaran muncul:
 - Ekspektasi gaji default.
 - Notice period.
 - Pengalaman kerja (tahun).
 - Kota domisili & kesediaan WFO.
 
-### 4. Generator Cover Letter Instan (`src/cover_letter.py`)
+### 6. Generator Cover Letter Instan (`src/cover_letter.py`)
 Menghasilkan surat lamaran kerja yang dipersonalisasi sesuai nama pelamar, nama perusahaan tujuan, dan posisi:
 - Pilihan gaya: **Formal Korporat**, **Fresh Graduate**, dan **Program Pemagangan**.
 
-### 5. Papan Pelacak Status Lamaran (Kanban Pipeline)
+### 7. Papan Pelacak Status Lamaran & Mini Analytics (Kanban Pipeline)
 Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
 - 📨 **Terkirim (Applied)**
 - 💬 **Panggilan Interview**
@@ -55,15 +67,16 @@ Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
 - ❌ **Ditolak / Gugur**
 Lengkap dengan fitur **Ekspor CSV/Excel** dengan 1 klik.
 
-### 6. Modul Direct Cold-Email (`src/email_sender.py`)
-Untuk lowongan yang tidak memiliki tombol apply di web (misal di Twitter atau LinkedIn yang meminta kirim email langsung ke HRD):
-- Kirim email profesional via SMTP (Gmail App Password).
-- Lampirkan file PDF CV secara otomatis.
+### 8. Kirim Lamaran Email (1-Click Gmail Draft / Mailto / SMTP)
+Untuk lowongan yang meminta kirim email langsung ke HRD:
+- **🌐 Buka di Gmail Web (1-Klik):** Langsung membuka tab draf Gmail di browser dengan Subjek dan Isi Surat terisi rapi tanpa perlu konfigurasi kata sandi aplikasi.
+- **✉️ Buka Mail App (Mailto):** Membuka aplikasi email bawaan sistem operasi.
+- **⚙️ Kirim via SMTP:** Opsi otomatis kirim via server SMTP (Gmail App Password) beserta lampiran file PDF CV.
 
-### 7. Notifikasi Telegram Bot Gratis (`src/notifier.py`)
+### 9. Notifikasi Telegram Bot Gratis (`src/notifier.py`)
 Menerima pemberitahuan langsung di aplikasi Telegram pribadi saat bot menemukan lowongan yang cocok dengan jurusan/profil kamu.
 
-### 8. Cadangan Data (Backup & Restore)
+### 10. Cadangan Data (Backup & Restore)
 Unduh seluruh konfigurasi dan riwayat lamaran dalam format JSON dengan tombol **Backup** di pojok kanan atas dashboard.
 
 ---

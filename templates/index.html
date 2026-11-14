@@ -64,7 +64,18 @@
     .badge-salary { color: var(--success); border-color: rgba(34, 197, 94, 0.3); }
     .badge-ats { background: rgba(168, 85, 247, 0.15); color: #c084fc; border-color: rgba(168, 85, 247, 0.4); font-weight: 700; }
 
+    /* RED FLAG ALERT BOX */
+    .red-flag-box { border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; line-height: 1.4; }
+    .red-flag-danger { background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); color: #fca5a5; }
+    .red-flag-warning { background: rgba(245, 158, 11, 0.15); border: 1px solid var(--warning); color: #fcd34d; }
+
     .job-actions { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
+
+    /* STATS BAR */
+    .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: #162032; border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+    .stat-val { font-size: 1.5rem; font-weight: 700; color: #fff; }
+    .stat-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-top: 4px; }
 
     /* KANBAN BOARD */
     .kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px; }
@@ -75,6 +86,17 @@
     .kanban-card-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
     .kanban-card-company { color: var(--primary); font-size: 0.8rem; margin-bottom: 6px; }
     .kanban-card-select { margin-top: 8px; font-size: 0.75rem; padding: 4px 8px; }
+
+    /* LIVE LOG CONSOLE */
+    .terminal-box { background: #090d16; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; max-height: 160px; overflow-y: auto; color: #94a3b8; }
+    .log-entry { margin-bottom: 4px; }
+    .log-info { color: #94a3b8; }
+    .log-success { color: var(--success); }
+    .log-warning { color: var(--warning); }
+    .log-danger { color: var(--danger); }
+
+    /* CV LIST TABLE */
+    .cv-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #0b1120; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
 
     /* MODAL */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
@@ -94,16 +116,17 @@
       </div>
       <div style="display: flex; gap: 10px; align-items: center;">
         <span class="badge" id="activeProfileBadge">Profil: Memuat...</span>
+        <span class="badge" id="activeCVBadge" style="color: var(--primary);">CV Aktif: Memuat...</span>
         <a href="/api/backup" class="btn btn-secondary btn-sm" title="Unduh cadangan data JSON">💾 Backup</a>
       </div>
     </header>
 
     <div class="nav-tabs">
       <button class="tab-btn active" onclick="switchTab('huntTab')">🔍 Berburu Loker & Magang</button>
-      <button class="tab-btn" onclick="switchTab('cvTab')">📄 Kelola CV & Skor ATS</button>
-      <button class="tab-btn" onclick="switchTab('kanbanTab')">📋 Papan Pelacak (Kanban)</button>
+      <button class="tab-btn" onclick="switchTab('cvTab')">📄 Kelola CV (${activeCVCount || '0'})</button>
+      <button class="tab-btn" onclick="switchTab('kanbanTab')">📋 Papan Pelacak & Statistik</button>
       <button class="tab-btn" onclick="switchTab('emailTab')">✉️ Cold Email HRD</button>
-      <button class="tab-btn" onclick="switchTab('profileTab')">⚙️ Pengaturan & Auto-Screening</button>
+      <button class="tab-btn" onclick="switchTab('profileTab')">⚙️ Profil & Standar Gaji UMR</button>
     </div>
 
     <!-- TAB 1: HUNT & REVIEW -->
@@ -126,30 +149,72 @@
         </div>
       </div>
 
+      <!-- LIVE ACTIVITY LOG -->
+      <div class="card" style="padding: 15px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">📡 Live Activity & Status Browser</span>
+          <button class="btn btn-secondary btn-sm" onclick="fetchLogs()" style="padding: 2px 8px; font-size: 0.75rem;">Segarkan Log</button>
+        </div>
+        <div class="terminal-box" id="terminalLogs">
+          <div class="log-entry log-info">[--:--:--] Sistem siap. Menunggu perintah pemindaian...</div>
+        </div>
+      </div>
+
       <div id="scanStatus" style="display: none; padding: 12px; background: #1e293b; border-radius: 8px; margin-bottom: 15px; font-size: 0.9rem; color: var(--primary);"></div>
 
       <div id="jobsContainer" class="job-list"></div>
     </div>
 
-    <!-- TAB 2: CV & ATS ANALYZER -->
+    <!-- TAB 2: MULTI-CV & ATS ANALYZER -->
     <div id="cvTab" class="tab-content">
       <div class="card">
-        <div class="card-title">Unggah CV & Pengecekan Skor Kecocokan ATS</div>
+        <div class="card-title">1. Daftar File CV Tersimpan (Multi-CV)</div>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
-          Unggah file PDF CV kamu di sini. Sistem akan otomatis menganalisis keahlian dan mengalkulasi persentase kecocokan ATS pada setiap lowongan yang ditemukan.
+          Kamu dapat mengunggah beberapa variasi CV (misal: versi IT, Administrasi, Desain). Pilih salah satu sebagai <strong>CV Aktif</strong> untuk kalkulasi skor kecocokan ATS dan lampiran email.
         </p>
+        <div id="cvListContainer">
+          <div style="font-size: 0.85rem; color: var(--text-muted);">Memuat daftar CV...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2. Unggah File PDF CV Baru</div>
         <div class="form-group">
-          <label>Pilih File PDF CV Kamu</label>
+          <label>Pilih File PDF</label>
           <input type="file" id="cvFileInput" accept=".pdf">
         </div>
-        <button class="btn btn-primary" onclick="uploadCV()">📤 Unggah & Analisis CV</button>
+        <button class="btn btn-primary" onclick="uploadCV()">📤 Unggah & Jadikan CV Aktif</button>
         <div id="cvUploadStatus" style="margin-top: 15px; font-size: 0.9rem;"></div>
       </div>
     </div>
 
-    <!-- TAB 3: KANBAN TRACKER -->
+    <!-- TAB 3: KANBAN TRACKER & ANALYTICS -->
     <div id="kanbanTab" class="tab-content">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <!-- ANALYTICS SUMMARY -->
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-val" id="statApplied" style="color: var(--primary);">0</div>
+          <div class="stat-lbl">Total Terkirim</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="statInterview" style="color: var(--warning);">0</div>
+          <div class="stat-lbl">Panggilan Interview</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="statOffering" style="color: var(--success);">0</div>
+          <div class="stat-lbl">Offering / Diterima</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="statRejected" style="color: var(--danger);">0</div>
+          <div class="stat-lbl">Ditolak / Gugur</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="statRate" style="color: #38bdf8;">0%</div>
+          <div class="stat-lbl">Tingkat Respons</div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
         <div class="card-title" style="margin-bottom: 0;">Papan Pelacak Status Lamaran (Pipeline)</div>
         <a href="/api/export" class="btn btn-secondary btn-sm">📥 Unduh Rekap (CSV/Excel)</a>
       </div>
@@ -189,10 +254,13 @@
       </div>
     </div>
 
-    <!-- TAB 4: DIRECT COLD EMAIL -->
+    <!-- TAB 4: DIRECT COLD EMAIL (1-CLICK GMAIL / MAILTO / SMTP) -->
     <div id="emailTab" class="tab-content">
       <div class="card">
         <div class="card-title">Kirim Lamaran Langsung ke Email HRD (Cold Email)</div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+          Cocok untuk lowongan di media sosial yang meminta kirim CV langsung ke alamat email HRD. Kamu bisa langsung membuka draf di <strong>Gmail Web (1-Klik)</strong> tanpa perlu repot konfigurasi password aplikasi.
+        </p>
         <div class="form-row">
           <div class="form-group">
             <label>Alamat Email HRD / Perusahaan</label>
@@ -215,15 +283,18 @@
           <label>Isi Surat Lamaran (Body Email)</label>
           <textarea id="emailBody" rows="8"></textarea>
         </div>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-secondary" onclick="generateEmailDraft()">📄 Buat Draft Otomatis</button>
-          <button class="btn btn-primary" onclick="sendDirectEmail()">✉️ Kirim Lamaran + Lampirkan CV</button>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="generateEmailDraft()">📄 Buat Draft Teks</button>
+          <button class="btn btn-primary" onclick="openGmailDraft()">🌐 Buka di Gmail Web (1-Klik)</button>
+          <button class="btn btn-secondary" onclick="openMailtoApp()">✉️ Buka Mail App (Mailto)</button>
+          <button class="btn btn-secondary" onclick="copyEmailBody()">📋 Salin Teks</button>
+          <button class="btn btn-purple" onclick="sendDirectEmailSMTP()" title="Kirim otomatis jika sudah setup SMTP">⚙️ Kirim via SMTP (Opsional)</button>
         </div>
         <div id="emailStatus" style="margin-top: 15px; font-size: 0.9rem;"></div>
       </div>
     </div>
 
-    <!-- TAB 5: PROFILE & SETTINGS -->
+    <!-- TAB 5: PROFILE & UMR SALARY GUIDE -->
     <div id="profileTab" class="tab-content">
       <div class="card">
         <div class="card-title">1. Profil Pencari Kerja & Jurusan</div>
@@ -239,7 +310,7 @@
         </div>
         <div class="form-group">
           <label>Bidang / Jurusan Kamu</label>
-          <input type="text" id="cfgMajor" placeholder="Contoh: Akuntansi, Desain Grafis, IT">
+          <input type="text" id="cfgMajor" placeholder="Contoh: Akuntansi, Mekatronika, IT, Desain Grafis">
         </div>
         <div class="form-group">
           <label>Kata Kunci Posisi yang Dicari (Pisahkan koma)</label>
@@ -247,7 +318,7 @@
         </div>
         <div class="form-group">
           <label>Tingkat Pengalaman</label>
-          <select id="cfgExp">
+          <select id="cfgExp" onchange="checkSalaryRecommendation()">
             <option value="fresh_graduate">Fresh Graduate (0 tahun)</option>
             <option value="junior">Junior (1 - 2 tahun)</option>
             <option value="mid">Mid-Level (3 - 4 tahun)</option>
@@ -262,25 +333,34 @@
       </div>
 
       <div class="card">
-        <div class="card-title">2. Jawaban Otomatis Form Screening (Auto-Fill)</div>
+        <div class="card-title">2. Jawaban Otomatis Form Screening & Panduan Gaji UMR</div>
         <div class="form-row">
+          <div class="form-group">
+            <label>Kota / Domisili Saat Ini</label>
+            <input type="text" id="cfgDomicile" placeholder="Jakarta" oninput="checkSalaryRecommendation()">
+          </div>
           <div class="form-group">
             <label>Ekspektasi Gaji Default (Angka)</label>
             <input type="text" id="cfgSalary" placeholder="6000000">
           </div>
+        </div>
+        <!-- SALARY GUIDE RECOMMENDATION BOX -->
+        <div id="salaryGuideBox" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 15px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <span style="font-weight: 600; color: var(--primary);">💡 Panduan Standar UMR:</span>
+            <span id="salaryGuideText" style="color: var(--text-muted); margin-left: 6px;">Memuat data UMR...</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="applySalaryRecommendation()" style="font-size: 0.75rem;">Gunakan Nilai Ini</button>
+        </div>
+
+        <div class="form-row">
           <div class="form-group">
             <label>Notice Period</label>
             <input type="text" id="cfgNotice" placeholder="Immediately">
           </div>
-        </div>
-        <div class="form-row">
           <div class="form-group">
             <label>Pengalaman Kerja (Tahun)</label>
             <input type="text" id="cfgYears" placeholder="1">
-          </div>
-          <div class="form-group">
-            <label>Kota / Domisili Saat Ini</label>
-            <input type="text" id="cfgDomicile" placeholder="Jakarta">
           </div>
         </div>
       </div>
@@ -335,13 +415,32 @@
     let currentConfig = null;
     let foundJobs = [];
     let activeCLJob = null;
+    let activeCVCount = 0;
+    let recommendedMinSalary = 5000000;
+    let logInterval = null;
 
     function switchTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
       event.target.classList.add('active');
-      if (tabId === 'kanbanTab') loadKanban();
+      if (tabId === 'kanbanTab') {
+        loadKanban();
+        loadAnalytics();
+      }
+      if (tabId === 'cvTab') loadCVList();
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/api/logs');
+        const logs = await res.json();
+        const box = document.getElementById('terminalLogs');
+        if (logs.length > 0) {
+          box.innerHTML = logs.map(l => `<div class="log-entry log-${l.level}">[${l.time}] ${l.message}</div>`).join('');
+          box.scrollTop = box.scrollHeight;
+        }
+      } catch (e) {}
     }
 
     async function loadConfig() {
@@ -356,7 +455,7 @@
         document.getElementById('cfgContact').value = prof.contact_info || '';
         document.getElementById('cfgMajor').value = prof.field_or_major || '';
         document.getElementById('cfgKeywords').value = (prof.target_keywords || []).join(', ');
-        document.getElementById('cfgExp').value = prof.experience_level || 'junior';
+        document.getElementById('cfgExp').value = prof.experience_level || 'fresh_graduate';
         document.getElementById('cfgBlacklist').value = (prof.blacklist_keywords || []).join(', ');
 
         document.getElementById('cfgSalary').value = scr.expected_salary || '6000000';
@@ -370,9 +469,28 @@
         
         document.getElementById('activeProfileBadge').innerText = 
           `${prof.field_or_major || 'Umum'} (${prof.experience_level || 'all'})`;
+
+        checkSalaryRecommendation();
       } catch (e) {
         console.error('Gagal memuat config:', e);
       }
+    }
+
+    async function checkSalaryRecommendation() {
+      const loc = document.getElementById('cfgDomicile').value.trim() || 'Jakarta';
+      const exp = document.getElementById('cfgExp').value;
+      try {
+        const res = await fetch(`/api/salary-guide?location=${encodeURIComponent(loc)}&exp=${encodeURIComponent(exp)}`);
+        const guide = await res.json();
+        recommendedMinSalary = guide.recommended_min;
+        document.getElementById('salaryGuideText').innerHTML = 
+          `Rentang wajar <strong>${guide.formatted_range}</strong> (UMR ${guide.location}: Rp ${guide.umr.toLocaleString('id-ID')})`;
+      } catch (e) {}
+    }
+
+    function applySalaryRecommendation() {
+      document.getElementById('cfgSalary').value = recommendedMinSalary;
+      alert(`Ekspektasi gaji disesuaikan ke standar minimum: Rp ${recommendedMinSalary.toLocaleString('id-ID')}`);
     }
 
     async function saveAllSettings() {
@@ -416,6 +534,71 @@
       }
     }
 
+    /* MULTI-CV LOGIC */
+    async function loadCVList() {
+      const container = document.getElementById('cvListContainer');
+      try {
+        const res = await fetch('/api/cvs');
+        const data = await res.json();
+        const cvs = data.cvs || [];
+        activeCVCount = cvs.length;
+        
+        document.getElementById('activeCVBadge').innerText = 
+          data.active_cv ? `CV: ${data.active_cv}` : 'Belum ada CV';
+
+        if (cvs.length === 0) {
+          container.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted);">Belum ada file CV yang diunggah. Silakan unggah CV pertama kamu di form bawah.</div>';
+          return;
+        }
+
+        container.innerHTML = cvs.map(c => `
+          <div class="cv-item" style="${c.active ? 'border-color: var(--primary); background: #132337;' : ''}">
+            <div>
+              <div style="font-weight: 600; color: #fff;">
+                📄 ${c.filename} ${c.active ? '<span class="badge" style="background:var(--primary); color:#000; margin-left:8px;">AKTIF</span>' : ''}
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${(c.size / 1024).toFixed(1)} KB</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              ${!c.active ? `<button class="btn btn-secondary btn-sm" onclick="setActiveCV('${c.filename}')">Jadikan Aktif</button>` : ''}
+              <button class="btn btn-danger btn-sm" onclick="deleteCV('${c.filename}')">Hapus</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = '<div style="color:var(--danger);">Gagal memuat daftar CV.</div>';
+      }
+    }
+
+    async function setActiveCV(filename) {
+      try {
+        const res = await fetch('/api/set-active-cv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: filename })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadCVList();
+        }
+      } catch (e) {}
+    }
+
+    async function deleteCV(filename) {
+      if (!confirm(`Hapus file CV '${filename}'?`)) return;
+      try {
+        const res = await fetch('/api/delete-cv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: filename })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadCVList();
+        }
+      } catch (e) {}
+    }
+
     async function uploadCV() {
       const fileInput = document.getElementById('cvFileInput');
       const statusDiv = document.getElementById('cvUploadStatus');
@@ -436,7 +619,9 @@
         });
         const data = await res.json();
         if (data.success) {
-          statusDiv.innerHTML = `<span style="color: var(--success); font-weight: 600;">[✓] ${data.message} (${data.char_count} karakter terdeteksi). Skor ATS sekarang akan aktif saat memindai lowongan!</span>`;
+          statusDiv.innerHTML = `<span style="color: var(--success); font-weight: 600;">[✓] ${data.message} (${data.char_count} karakter terdeteksi).</span>`;
+          fileInput.value = '';
+          loadCVList();
         } else {
           statusDiv.innerHTML = `<span style="color: var(--danger);">[x] ${data.error}</span>`;
         }
@@ -445,6 +630,7 @@
       }
     }
 
+    /* SCANNING & JOB SEARCH */
     async function startScan() {
       const platform = document.getElementById('platformSelect').value;
       const btn = document.getElementById('btnScan');
@@ -454,8 +640,11 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Sedang Memindai...';
       status.style.display = 'block';
-      status.innerText = `[*] Membuka browser untuk memindai ${platform.toUpperCase()}... Jendela browser akan terbuka. Pastikan login jika diminta.`;
+      status.innerText = `[*] Membuka browser untuk memindai ${platform.toUpperCase()}... Jendela browser Playwright akan terbuka.`;
       container.innerHTML = '';
+
+      fetchLogs();
+      if (!logInterval) logInterval = setInterval(fetchLogs, 2500);
 
       try {
         const res = await fetch('/api/scan', {
@@ -477,6 +666,9 @@
       } finally {
         btn.disabled = false;
         btn.innerText = '🔍 Mulai Pindai Sekarang';
+        clearInterval(logInterval);
+        logInterval = null;
+        fetchLogs();
       }
     }
 
@@ -492,6 +684,17 @@
         const ats = job.ats || { score: 70, status: 'Sedang' };
         const atsScoreBadge = `<span class="badge badge-ats">🎯 ATS Match: ${ats.score}% (${ats.status})</span>`;
 
+        let redFlagHtml = '';
+        if (job.red_flag && job.red_flag.is_red_flag) {
+          const cls = job.red_flag.risk_level === 'danger' ? 'red-flag-danger' : 'red-flag-warning';
+          redFlagHtml = `
+            <div class="red-flag-box ${cls}">
+              <strong>⚠️ PERINGATAN POTENSI RED FLAG:</strong> ${job.red_flag.flags.join(' • ')}<br>
+              <span style="font-size:0.75rem; opacity:0.9;">${job.red_flag.advice}</span>
+            </div>
+          `;
+        }
+
         card.innerHTML = `
           <div class="job-header">
             <div>
@@ -500,6 +703,7 @@
             </div>
             ${atsScoreBadge}
           </div>
+          ${redFlagHtml}
           <div class="job-badges">
             <span class="badge badge-salary">${job.salary || 'Gaji/Uang saku tidak dicantumkan'}</span>
             ${job.location ? `<span class="badge">${job.location}</span>` : ''}
@@ -566,7 +770,19 @@
       } catch (e) {}
     }
 
-    /* KANBAN BOARD LOGIC */
+    /* KANBAN BOARD & ANALYTICS */
+    async function loadAnalytics() {
+      try {
+        const res = await fetch('/api/analytics');
+        const stats = await res.json();
+        document.getElementById('statApplied').innerText = stats.applied || 0;
+        document.getElementById('statInterview').innerText = stats.interview || 0;
+        document.getElementById('statOffering').innerText = stats.offering || 0;
+        document.getElementById('statRejected').innerText = stats.rejected || 0;
+        document.getElementById('statRate').innerText = `${stats.response_rate || 0}%`;
+      } catch (e) {}
+    }
+
     async function loadKanban() {
       try {
         const res = await fetch('/api/history');
@@ -612,6 +828,7 @@
           body: JSON.stringify({ url: url, status: newStatus, notes: note })
         });
         loadKanban();
+        loadAnalytics();
       } catch (e) {}
     }
 
@@ -648,7 +865,7 @@
       alert('Surat lamaran berhasil disalin ke clipboard!');
     }
 
-    /* DIRECT COLD EMAIL */
+    /* DIRECT COLD EMAIL (1-CLICK GMAIL / MAILTO / SMTP) */
     async function generateEmailDraft() {
       const role = document.getElementById('emailRole').value || 'Staff';
       const company = document.getElementById('emailCompany').value || 'Perusahaan';
@@ -666,7 +883,48 @@
       } catch (e) {}
     }
 
-    async function sendDirectEmail() {
+    function openGmailDraft() {
+      const to = document.getElementById('emailTo').value.trim();
+      const sub = document.getElementById('emailSubject').value.trim();
+      const body = document.getElementById('emailBody').value.trim();
+
+      if (!to || !sub || !body) {
+        alert('Mohon isi alamat email tujuan, subjek, dan badan email terlebih dahulu.');
+        return;
+      }
+
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
+      window.open(gmailUrl, '_blank');
+      
+      // Catat ke history pipeline
+      fetch('/api/status-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: `mailto:${to}`, status: 'applied', notes: 'Draft Gmail Web 1-Klik' })
+      }).catch(() => {});
+    }
+
+    function openMailtoApp() {
+      const to = document.getElementById('emailTo').value.trim();
+      const sub = document.getElementById('emailSubject').value.trim();
+      const body = document.getElementById('emailBody').value.trim();
+
+      if (!to || !sub || !body) {
+        alert('Mohon isi alamat email tujuan, subjek, dan badan email terlebih dahulu.');
+        return;
+      }
+
+      window.location.href = `mailto:${to}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
+    }
+
+    function copyEmailBody() {
+      const body = document.getElementById('emailBody');
+      body.select();
+      document.execCommand('copy');
+      alert('Teks surat lamaran berhasil disalin!');
+    }
+
+    async function sendDirectEmailSMTP() {
       const to = document.getElementById('emailTo').value.trim();
       const sub = document.getElementById('emailSubject').value.trim();
       const body = document.getElementById('emailBody').value.trim();
@@ -689,14 +947,16 @@
         if (data.success) {
           statusDiv.innerHTML = `<span style="color: var(--success); font-weight:600;">[✓] ${data.message}</span>`;
         } else {
-          statusDiv.innerHTML = `<span style="color: var(--danger);">[x] ${data.message}</span>`;
+          statusDiv.innerHTML = `<span style="color: var(--danger);">[x] ${data.message} (Tip: Gunakan tombol 'Buka di Gmail Web' jika belum setup SMTP password)</span>`;
         }
       } catch (e) {
-        statusDiv.innerHTML = '<span style="color: var(--danger);">[x] Gagal mengirim email</span>';
+        statusDiv.innerHTML = '<span style="color: var(--danger);">[x] Gagal mengirim email via SMTP</span>';
       }
     }
 
     loadConfig();
+    loadCVList();
+    fetchLogs();
   </script>
 </body>
 </html>

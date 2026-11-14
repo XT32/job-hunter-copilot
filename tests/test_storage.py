@@ -53,5 +53,20 @@ class TestStorage(unittest.TestCase):
             reader = list(csv.reader(f))
             self.assertEqual(len(reader), 3)
 
+    def test_analytics_summary(self):
+        storage.record_job("https://glints.com/id/1", "Dev 1", "PT A", status="applied")
+        storage.record_job("https://id.jobstreet.com/2", "Dev 2", "PT B", status="interview")
+        storage.record_job("https://dealls.com/3", "Dev 3", "PT C", status="offering")
+
+        stats = storage.get_analytics_summary()
+        self.assertEqual(stats["applied"], 1)
+        self.assertEqual(stats["interview"], 1)
+        self.assertEqual(stats["offering"], 1)
+        self.assertEqual(stats["total_submitted"], 3)
+        self.assertAlmostEqual(stats["response_rate"], 66.7, places=1)
+        self.assertEqual(stats["platforms"]["glints"], 1)
+        self.assertEqual(stats["platforms"]["jobstreet"], 1)
+        self.assertEqual(stats["platforms"]["dealls"], 1)
+
 if __name__ == "__main__":
     unittest.main()
