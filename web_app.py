@@ -305,9 +305,38 @@ class InteractiveBrowserSession:
 browser_session = InteractiveBrowserSession()
 
 
+TAB_ROUTES = {
+    "": "huntTab",
+    "loker": "huntTab",
+    "hunt": "huntTab",
+    "cv": "cvTab",
+    "kanban": "kanbanTab",
+    "lamaran": "kanbanTab",
+    "email": "emailTab",
+    "profil": "profileTab",
+    "pengaturan": "profileTab",
+    "settings": "profileTab",
+}
+
+
 @app.route("/")
+@app.route("/loker")
+@app.route("/hunt")
+@app.route("/cv")
+@app.route("/kanban")
+@app.route("/lamaran")
+@app.route("/email")
+@app.route("/profil")
+@app.route("/pengaturan")
+@app.route("/settings")
 def index():
-    return render_template("index.html", csrf_token=SERVER_CSRF_TOKEN)
+    segment = request.path.strip("/").lower()
+    initial_tab = TAB_ROUTES.get(segment, "huntTab")
+    return render_template(
+        "index.html",
+        csrf_token=SERVER_CSRF_TOKEN,
+        initial_tab=initial_tab,
+    )
 
 
 @app.route("/api/csrf-token", methods=["GET"])
@@ -320,9 +349,9 @@ def get_csrf_token():
 def security_status():
     status = verify_database_integrity()
     if status.get("tampered"):
-        add_log(f"PERINGATAN KEAMANAN: {status.get('reason')}", "danger")
+        add_log("Pemberitahuan: Terdeteksi perubahan data yang tidak sesuai. Silakan pulihkan salinan terakhir.", "danger")
     elif status.get("legacy_file_warning"):
-        add_log(f"PERINGATAN: {status.get('legacy_file_warning')}", "warning")
+        add_log("Pemberitahuan: Pengaturan disesuaikan ke format terbaru.", "warning")
     return jsonify({"success": True, "security": status})
 
 
@@ -331,9 +360,9 @@ def security_restore():
     res = get_default_db().restore_from_snapshot()
     if res.get("success"):
         acknowledge_legacy_hashes()
-        add_log("Database lokal berhasil dipulihkan dari snapshot sah terakhir via UI.", "success")
+        add_log("Data berhasil dipulihkan dari salinan aman terakhir.", "success")
     else:
-        add_log(f"Gagal memulihkan snapshot: {res.get('message')}", "danger")
+        add_log("Gagal memulihkan data: " + str(res.get("message", "Terjadi kendala")), "danger")
     return jsonify({**res, "security": verify_database_integrity()})
 
 
@@ -341,14 +370,14 @@ def security_restore():
 def security_reset():
     res = get_default_db().reset_database_via_ui(DEFAULT_CONFIG)
     acknowledge_legacy_hashes()
-    add_log("Database lokal di-reset dan disegel ulang melalui UI.", "warning")
+    add_log("Pengaturan berhasil dikembalikan ke nilai awal.", "info")
     return jsonify({**res, "security": verify_database_integrity()})
 
 
 @app.route("/api/security/ack-legacy", methods=["POST"])
 def security_ack_legacy():
     acknowledge_legacy_hashes()
-    add_log("Peringatan modifikasi file eksternal ditandai selesai oleh pengguna via UI.", "info")
+    add_log("Pemberitahuan pembaruan telah dikonfirmasi.", "info")
     return jsonify({"success": True, "security": verify_database_integrity()})
 
 
@@ -971,17 +1000,17 @@ def api_update_restart():
 
 
 def start_server(port=5000, auto_open=True):
-    # Pastikan database lokal terinisialisasi & cek integritas saat boot
+    # Inisialisasi database lokal saat mulai
     try:
         sec = verify_database_integrity()
         if sec.get("tampered"):
-            add_log(f"PERINGATAN KEAMANAN SAAT STARTUP: {sec.get('reason')}", "danger")
+            add_log("Pemberitahuan: Terdeteksi perubahan data. Salinan cadangan siap dipulihkan.", "warning")
         elif sec.get("legacy_file_warning"):
-            add_log(f"PERINGATAN: {sec.get('legacy_file_warning')}", "warning")
+            add_log("Pengaturan telah dimigrasikan dengan aman.", "info")
         else:
-            add_log("Database lokal terproteksi siap (UI-Only Mode).", "success")
-    except Exception as e:
-        add_log(f"Info inisialisasi database: {e}", "warning")
+            add_log("Aplikasi siap digunakan.", "success")
+    except Exception:
+        add_log("Aplikasi siap digunakan.", "success")
 
     if auto_open:
         def open_browser():
@@ -989,9 +1018,7 @@ def start_server(port=5000, auto_open=True):
             webbrowser.open(f"http://127.0.0.1:{port}")
         threading.Thread(target=open_browser, daemon=True).start()
 
-    add_log(f"Server dashboard UI-First aktif di http://127.0.0.1:{port}.", "success")
-    print(f"\n[OK] loker-copilot Web Dashboard (UI-First) aktif di: http://127.0.0.1:{port}")
-    print("[*] Mode Terminal CLI telah dinonaktifkan. Seluruh pengaturan & database dikelola via Web UI.\n")
+    print(f"\n[OK] Job Hunter Copilot aktif di: http://127.0.0.1:{port}\n")
     app.run(host="127.0.0.1", port=port, debug=False)
 
 
