@@ -73,6 +73,7 @@ class JobstreetHunter(BaseJobHunter):
                     company = "Perusahaan tidak dicantumkan"
                     salary = "Tidak dicantumkan"
                     location = ""
+                    description = ""
 
                     if container.is_visible():
                         try:
@@ -96,7 +97,14 @@ class JobstreetHunter(BaseJobHunter):
                         except Exception:
                             pass
 
-                    is_match, reason = self.matcher.evaluate(title, company, location=location)
+                        try:
+                            desc_el = container.locator("[data-automation='jobShortDescription'], [data-automation='jobSnippet'], span[class*='teaser']").first
+                            if desc_el.is_visible():
+                                description = desc_el.inner_text().strip()
+                        except Exception:
+                            pass
+
+                    is_match, reason = self.matcher.evaluate(title, company, location=location, description=description)
                     if not is_match:
                         record_job(clean_url, title, company, status="skipped", notes=f"JobStreet Filter: {reason}")
                         continue
@@ -106,6 +114,7 @@ class JobstreetHunter(BaseJobHunter):
                         "company": company,
                         "salary": salary,
                         "location": location,
+                        "description": description,
                         "url": clean_url,
                     })
                 except Exception:
@@ -217,9 +226,11 @@ class JobstreetHunter(BaseJobHunter):
             # 3. Cek apakah diarahkan ke halaman login SEEK/JobStreet
             current_url = (self.page.url or "").lower()
             if "login.seek.com" in current_url or "/login" in current_url or "signin" in current_url:
+                shot = self._capture_failure_screenshot("jobstreet", "login_required")
                 return {
                     "status": "login_required",
                     "message": "Sesi JobStreet belum login. Silakan login di jendela browser yang tetap terbuka, lalu selesaikan lamaran.",
+                    "screenshot": shot,
                 }
 
             confirm_before_submit = bool(self.config.get("screening_defaults", {}).get("confirm_before_submit", False))
@@ -239,9 +250,12 @@ class JobstreetHunter(BaseJobHunter):
                 ).first
                 if submit_btn.is_visible(timeout=1500):
                     if confirm_before_submit:
+                        shot = self._capture_failure_screenshot("jobstreet", "review_pause")
                         return {
                             "status": "manual_action_needed",
                             "message": "Tahap 1–3 selesai! Browser berhenti di halaman 'Review dan kirim'. Silakan cek & klik 'Kirim lamaran' di browser, lalu klik 'Sudah Saya Kirim' di dashboard.",
+                            "screenshot": shot,
+                            "unanswered_questions": self.screener.last_unanswered,
                         }
                     submit_btn.click()
                     human_delay(2.5, 3.5)
@@ -252,9 +266,12 @@ class JobstreetHunter(BaseJobHunter):
                     self._handle_choose_documents_step(job_title, company)
                     if self._click_continue_button():
                         continue
+                    shot = self._capture_failure_screenshot("jobstreet", "doc_select")
                     return {
                         "status": "manual_action_needed",
                         "message": "Di tahap 'Pilih dokumen' JobStreet: silakan pilih/unggah CV di jendela browser yang terbuka, lalu klik Lanjut dan selesaikan.",
+                        "screenshot": shot,
+                        "unanswered_questions": self.screener.last_unanswered,
                     }
 
                 # Cek Tahap 2: Jawab Pertanyaan Perusahaan
@@ -263,18 +280,21 @@ class JobstreetHunter(BaseJobHunter):
                     human_delay(0.8, 1.5)
                     url_before = self.page.url
                     if self._click_continue_button():
-                        # Jika gagal lanjut karena ada pertanyaan wajib yang belum terjawab
                         if self.page.url == url_before and self._page_has_text(["wajib diisi", "required", "harus diisi", "mohon jawab"]):
-                            unanswered = "; ".join(self.screener.last_unanswered[:3])
-                            hint = f" ({unanswered})" if unanswered else ""
+                            shot = self._capture_failure_screenshot("jobstreet", "unanswered_qa")
                             return {
                                 "status": "manual_action_needed",
-                                "message": f"Ada pertanyaan perusahaan wajib yang butuh jawaban manual{hint}. Silakan lengkapi di browser yang terbuka.",
+                                "message": "Ada pertanyaan perusahaan wajib yang butuh jawaban manual. Silakan lengkapi di browser yang terbuka.",
+                                "screenshot": shot,
+                                "unanswered_questions": self.screener.last_unanswered,
                             }
                         continue
+                    shot = self._capture_failure_screenshot("jobstreet", "questions_step")
                     return {
                         "status": "manual_action_needed",
                         "message": "Muncul pertanyaan perusahaan JobStreet. Silakan lengkapi jawabannya di browser yang terbuka.",
+                        "screenshot": shot,
+                        "unanswered_questions": self.screener.last_unanswered,
                     }
 
                 # Cek Tahap 3: Perbarui Profil JobStreet
@@ -282,15 +302,22 @@ class JobstreetHunter(BaseJobHunter):
                     if self._click_continue_button():
                         continue
 
-                # Fallback umum: jalankan screener lalu coba klik Lanjut jika ada
                 self.screener.auto_fill_form()
                 if self._click_continue_button():
                     continue
                 break
 
+            shot = self._capture_failure_screenshot("jobstreet", "manual_action")
             return {
                 "status": "manual_action_needed",
                 "message": "Wizard lamaran JobStreet terbuka di browser. Silakan lengkapi tahap yang tersisa di browser, lalu konfirmasi di dashboard.",
+                "screenshot": shot,
+                "unanswered_questions": self.screener.last_unanswered,
             }
         except Exception as e:
-            return {"status": "error", "message": f"Terjadi kesalahan di JobStreet: {str(e)}"}
+            shot = self._capture_failure_screenshot("jobstreet", "error")
+            return {
+                "status": "error",
+                "message": f"Terjadi kesalahan di JobStreet: {str(e)}",
+                "screenshot": shot,
+            }

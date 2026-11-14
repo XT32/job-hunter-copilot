@@ -24,6 +24,13 @@ DEFAULT_DB_PATH = os.path.join(DATA_DIR, "loker_copilot.db")
 _db_lock = threading.RLock()
 
 
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    HAS_AESGCM = True
+except Exception:
+    HAS_AESGCM = False
+
+
 class TamperDetectedError(RuntimeError):
     """Dilemparkan ketika terdeteksi modifikasi database di luar Web UI."""
 
@@ -34,7 +41,7 @@ class TamperDetectedError(RuntimeError):
 
 
 def _keystream(key: bytes, nonce: bytes, length: int) -> bytes:
-    """Menghasilkan keystream deterministik berbasis SHA-256 counter mode."""
+    """Menghasilkan keystream deterministik berbasis SHA-256 counter mode (fallback mode)."""
     chunks = []
     counter = 0
     total = 0
@@ -47,8 +54,14 @@ def _keystream(key: bytes, nonce: bytes, length: int) -> bytes:
 
 
 def _encrypt_text(key: bytes, plaintext: str) -> str:
-    nonce = secrets.token_bytes(16)
     raw = plaintext.encode("utf-8")
+    if HAS_AESGCM:
+        aes = AESGCM(key)
+        nonce = secrets.token_bytes(12)
+        ct = aes.encrypt(nonce, raw, b"LOKER_COPILOT_DB")
+        return "gcm$" + base64.urlsafe_b64encode(nonce + ct).decode("ascii")
+
+    nonce = secrets.token_bytes(16)
     stream = _keystream(key, nonce, len(raw))
     cipher = bytes(a ^ b for a, b in zip(raw, stream))
     tag = hmac.new(key, b"ENC|" + nonce + cipher, hashlib.sha256).digest()
@@ -56,6 +69,17 @@ def _encrypt_text(key: bytes, plaintext: str) -> str:
 
 
 def _decrypt_text(key: bytes, token: str) -> str:
+    if token.startswith("gcm$"):
+        if not HAS_AESGCM:
+            raise ValueError("Modul cryptography diperlukan untuk membuka payload AES-GCM.")
+        raw = base64.urlsafe_b64decode(token[4:].encode("ascii"))
+        nonce = raw[:12]
+        ct = raw[12:]
+        aes = AESGCM(key)
+        plain = aes.decrypt(nonce, ct, b"LOKER_COPILOT_DB")
+        return plain.decode("utf-8")
+
+    # Format kompatibilitas / fallback
     raw = base64.urlsafe_b64decode(token.encode("ascii"))
     if len(raw) < 48:
         raise ValueError("Payload terenkripsi rusak atau terpotong")
@@ -100,11 +124,31 @@ class LocalSecureDB:
 
     def _get_or_create_key(self) -> bytes:
         self._ensure_dirs()
+        # 1. Coba baca dari OS Keyring jika tersedia
+        try:
+            import keyring
+            stored = keyring.get_password("loker_copilot", f"key_{self.db_name}")
+            if stored:
+                raw_k = base64.urlsafe_b64decode(stored.encode("ascii"))
+                if len(raw_k) == 32:
+                    return raw_k
+        except Exception:
+            pass
+
+        # 2. Coba baca dari file .key lokal
         if os.path.exists(self.key_path):
             with open(self.key_path, "rb") as f:
                 data = f.read().strip()
             if len(data) >= 32:
-                return base64.urlsafe_b64decode(data)
+                key = base64.urlsafe_b64decode(data)
+                try:
+                    import keyring
+                    keyring.set_password("loker_copilot", f"key_{self.db_name}", base64.urlsafe_b64encode(key).decode("ascii"))
+                except Exception:
+                    pass
+                return key
+
+        # 3. Buat kunci master baru 32-byte (AES-256)
         key = secrets.token_bytes(32)
         with open(self.key_path, "wb") as f:
             f.write(base64.urlsafe_b64encode(key))
@@ -112,6 +156,13 @@ class LocalSecureDB:
             os.chmod(self.key_path, 0o600)
         except Exception:
             pass
+
+        try:
+            import keyring
+            keyring.set_password("loker_copilot", f"key_{self.db_name}", base64.urlsafe_b64encode(key).decode("ascii"))
+        except Exception:
+            pass
+
         return key
 
     def _connect(self) -> sqlite3.Connection:

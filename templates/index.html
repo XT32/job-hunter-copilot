@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>loker-cli Dashboard — Platform Karir & Magang</title>
   <style>
     :root {
@@ -135,9 +136,11 @@
         <div class="tagline">Platform Karir & Magang (Glints, JobStreet, MagangHub, Dealls)</div>
       </div>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <span class="badge" id="rateLimitBadge" style="color: var(--primary); border-color: rgba(56,189,248,0.4);" title="Batas aman pengiriman lamaran">🛡️ Kuota: Memuat...</span>
         <span class="badge" id="dbSecurityBadge" style="color: var(--success); border-color: rgba(34,197,94,0.4);">🔒 DB Lokal: Memeriksa...</span>
         <span class="badge" id="activeProfileBadge">Profil: Memuat...</span>
         <span class="badge" id="activeCVBadge" style="color: var(--primary);">CV Aktif: Memuat...</span>
+        <button class="btn btn-secondary btn-sm" onclick="openDiagnosticModal()" title="Cek status portal & unduh debug bundle">🩺 Diagnosa</button>
         <button class="btn btn-secondary btn-sm" id="btnHeaderUpdate" onclick="openUpdateModal()" title="Cek & perbarui aplikasi langsung dari GitHub">🔄 Cek Update</button>
         <a href="/api/backup" class="btn btn-secondary btn-sm" title="Unduh cadangan data JSON">💾 Backup</a>
       </div>
@@ -285,7 +288,10 @@
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
         <div class="card-title" style="margin-bottom: 0;">Papan Pelacak Status Lamaran (Pipeline)</div>
-        <a href="/api/export" class="btn btn-secondary btn-sm">📥 Unduh Rekap (CSV/Excel)</a>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <a href="/api/job/export-ics" class="btn btn-secondary btn-sm" title="Ekspor seluruh jadwal wawancara ke Google Calendar/Outlook/Apple Calendar">📅 Unduh Jadwal (.ics)</a>
+          <a href="/api/export" class="btn btn-secondary btn-sm">📥 Unduh Rekap (CSV/Excel)</a>
+        </div>
       </div>
 
       <div class="kanban-board">
@@ -562,7 +568,94 @@
     </div>
   </div>
 
+  <!-- MODAL DIAGNOSA SISTEM & DEBUG BUNDLE -->
+  <div class="modal-overlay" id="diagnosticModal">
+    <div class="modal" style="max-width: 650px;">
+      <div class="card-title">🩺 Diagnosa Kesehatan Portal & Laporan Masalah</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        Periksa status akses ke JobStreet, Glints, MagangHub, dan Dealls secara real-time. Jika mengalami kendala, unduh berkas laporan masalah yang telah <strong>disensor aman tanpa membocorkan kata sandi/data pribadi</strong>.
+      </p>
+      <div id="diagnosticResultsBox" style="background:#0b1120; border:1px solid var(--border); border-radius:8px; padding:12px; font-size:0.85rem; margin-bottom:15px;">
+        Memeriksa konektivitas portal dan status lingkungan...
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="closeDiagnosticModal()">Tutup</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="runDiagnosticCheck()">🔄 Periksa Ulang</button>
+          <a href="/api/diagnostic/bundle" class="btn btn-primary">📥 Unduh Laporan Debug (ZIP)</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL JADWAL INTERVIEW (.ICS) -->
+  <div class="modal-overlay" id="interviewModal">
+    <div class="modal">
+      <div class="card-title">📅 Atur Jadwal Wawancara Kerja</div>
+      <div style="font-size:0.85rem; color:var(--primary); margin-bottom:10px;" id="interviewModalJobTitle">Posisi - Perusahaan</div>
+      <div class="form-group">
+        <label>Tanggal & Jam Wawancara</label>
+        <input type="datetime-local" id="interviewInputDateTime">
+      </div>
+      <div class="form-group">
+        <label>Lokasi / Tautan Meeting (Zoom, Google Meet, atau Alamat Kantor)</label>
+        <input type="text" id="interviewInputLocation" placeholder="Contoh: https://meet.google.com/xyz atau Gedung Graha Lantai 4">
+      </div>
+      <div class="form-group">
+        <label>Catatan Tambahan (Nama Pewawancara / Topik)</label>
+        <textarea id="interviewInputNotes" rows="3" placeholder="Contoh: Interview dengan User (Bapak Rian). Siapkan portofolio."></textarea>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="closeInterviewModal()">Batal</button>
+        <button class="btn btn-success" onclick="saveInterviewSchedule()">💾 Simpan & Catat ke Interview</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL BANK Q&A PERTANYAAN BARU -->
+  <div class="modal-overlay" id="qaModal">
+    <div class="modal">
+      <div class="card-title">💡 Pertanyaan Baru Perusahaan Terdeteksi</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+        Pertanyaan di bawah ini belum ada di Bank Jawaban Anda. Masukkan jawaban Anda sekarang agar otomatis terjawab di lamaran berikutnya!
+      </p>
+      <div id="qaQuestionsList" style="display:flex; flex-direction:column; gap:12px; margin-bottom:15px; max-height:300px; overflow-y:auto;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn btn-secondary" onclick="closeQaModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const CSRF_TOKEN = "{{ csrf_token }}";
+
+    // Auto-attach CSRF Token security headers to all fetch requests
+    const _nativeFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+      options = options || {};
+      options.headers = options.headers || {};
+      if (options.headers instanceof Headers) {
+        if (!options.headers.has('X-CSRF-Token')) {
+          options.headers.set('X-CSRF-Token', CSRF_TOKEN);
+        }
+      } else if (Array.isArray(options.headers)) {
+        options.headers.push(['X-CSRF-Token', CSRF_TOKEN]);
+      } else {
+        options.headers['X-CSRF-Token'] = CSRF_TOKEN;
+      }
+      return _nativeFetch(url, options);
+    };
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     let currentConfig = null;
     let foundJobs = [];
     let activeCLJob = null;
@@ -1111,32 +1204,41 @@
         card.id = `job-${index}`;
 
         const ats = job.ats || { score: 70, status: 'Sedang' };
-        const atsScoreBadge = `<span class="badge badge-ats">🎯 ATS Match: ${ats.score}% (${ats.status})</span>`;
+        const atsScoreBadge = `<span class="badge badge-ats">🎯 ATS Match: ${escapeHtml(ats.score)}% (${escapeHtml(ats.status)})</span>`;
 
         let redFlagHtml = '';
         if (job.red_flag && job.red_flag.is_red_flag) {
           const cls = job.red_flag.risk_level === 'danger' ? 'red-flag-danger' : 'red-flag-warning';
+          const safeFlags = (job.red_flag.flags || []).map(f => escapeHtml(f)).join(' • ');
           redFlagHtml = `
             <div class="red-flag-box ${cls}">
-              <strong>⚠️ PERINGATAN POTENSI RED FLAG:</strong> ${job.red_flag.flags.join(' • ')}<br>
-              <span style="font-size:0.75rem; opacity:0.9;">${job.red_flag.advice}</span>
+              <strong>⚠️ PERINGATAN POTENSI RED FLAG:</strong> ${safeFlags}<br>
+              <span style="font-size:0.75rem; opacity:0.9;">${escapeHtml(job.red_flag.advice || '')}</span>
             </div>
           `;
         }
 
+        const titleSafe = escapeHtml(job.title || 'Posisi');
+        const companySafe = escapeHtml(job.company || 'Perusahaan');
+        const salarySafe = escapeHtml(job.salary || 'Gaji/Uang saku tidak dicantumkan');
+        const locSafe = escapeHtml(job.location || '');
+        const matchedSkills = (ats.matched && ats.matched.length)
+          ? ats.matched.map(s => escapeHtml(s)).join(', ')
+          : '';
+
         card.innerHTML = `
           <div class="job-header">
             <div>
-              <a href="${job.url}" target="_blank" class="job-title">${job.title}</a>
-              <div class="job-company">${job.company}</div>
+              <a href="${encodeURI(job.url || '#')}" target="_blank" rel="noopener noreferrer" class="job-title">${titleSafe}</a>
+              <div class="job-company">${companySafe}</div>
             </div>
             ${atsScoreBadge}
           </div>
           ${redFlagHtml}
           <div class="job-badges">
-            <span class="badge badge-salary">${job.salary || 'Gaji/Uang saku tidak dicantumkan'}</span>
-            ${job.location ? `<span class="badge">${job.location}</span>` : ''}
-            ${ats.matched && ats.matched.length ? `<span class="badge" style="color:#38bdf8;">Keahlian Cocok: ${ats.matched.join(', ')}</span>` : ''}
+            <span class="badge badge-salary">${salarySafe}</span>
+            ${locSafe ? `<span class="badge">${locSafe}</span>` : ''}
+            ${matchedSkills ? `<span class="badge" style="color:#38bdf8;">Keahlian Cocok: ${matchedSkills}</span>` : ''}
           </div>
           <div class="job-actions">
             <button class="btn btn-success btn-sm" onclick="applyJob(${index})">✅ Lamar Otomatis</button>
@@ -1175,26 +1277,47 @@
           actions.innerHTML = `<span style="color: var(--danger); font-size: 0.85rem;">[!] Diblokir karena peringatan keamanan DB.</span>`;
           return;
         }
+
+        if (data.rate_limited) {
+          card.style.opacity = '1';
+          actions.innerHTML = `<div style="color:var(--danger); font-size:0.85rem; font-weight:600;">🛑 ${escapeHtml(data.error)}</div>`;
+          loadRateLimits();
+          return;
+        }
+
         renderBrowserBar(data.browser);
         fetchLogs();
+        loadRateLimits();
+
+        // Tangkapan layar kegagalan/review jika ada
+        const shotBtn = data.screenshot
+          ? `<a href="/api/screenshots/${encodeURIComponent(data.screenshot)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:0.75rem;">📸 Lihat Bukti Layar</a>`
+          : '';
+
+        // Tampilkan pertanyaan baru jika terdeteksi
+        if (data.unanswered_questions && data.unanswered_questions.length > 0) {
+          showUnansweredQuestionsModal(data.unanswered_questions);
+        }
 
         if (data.success && data.result.status === 'success') {
           card.style.opacity = '1';
-          actions.innerHTML = '<span style="color: var(--success); font-weight: 600;">[✓] Lamaran Berhasil Terkirim!</span>';
+          actions.innerHTML = `<span style="color: var(--success); font-weight: 600;">[✓] Lamaran Berhasil Terkirim!</span> ${shotBtn}`;
         } else if (data.success && (data.result.status === 'manual_action_needed' || data.result.status === 'login_required')) {
           card.style.opacity = '1';
           actions.innerHTML = `
             <div style="width:100%; display:flex; flex-direction:column; gap:8px;">
-              <span style="color: var(--warning); font-size: 0.85rem;">[!] ${data.result.message}</span>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span style="color: var(--warning); font-size: 0.85rem;">[!] ${escapeHtml(data.result.message)}</span>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 <button class="btn btn-success btn-sm" onclick="markCardApplied(${index})">✅ Sudah Saya Kirim & Tutup Browser</button>
                 <button class="btn btn-secondary btn-sm" onclick="applyJob(${index})">🔄 Coba Jalankan Ulang</button>
+                ${shotBtn}
               </div>
             </div>
           `;
         } else {
           card.style.opacity = '1';
-          actions.innerHTML = `<span style="color: var(--warning); font-size: 0.85rem;">[!] ${data.result ? data.result.message : (data.error || 'Selesaikan di browser')}</span>`;
+          const errMsg = data.result ? data.result.message : (data.error || 'Selesaikan di browser');
+          actions.innerHTML = `<span style="color: var(--warning); font-size: 0.85rem;">[!] ${escapeHtml(errMsg)}</span> ${shotBtn}`;
         }
       } catch (e) {
         card.style.opacity = '1';
@@ -1215,6 +1338,7 @@
       if (card) {
         card.querySelector('.job-actions').innerHTML = '<span style="color: var(--success); font-weight: 600;">[✓] Lamaran Dicatat Terkirim!</span>';
       }
+      loadRateLimits();
     }
 
     async function skipJob(index) {
@@ -1258,19 +1382,44 @@
         statuses.forEach(st => {
           const items = hist[st] || [];
           const cap = st.charAt(0).toUpperCase() + st.slice(1);
-          document.getElementById(`count${cap}`).innerText = items.length;
-          
+          const countEl = document.getElementById(`count${cap}`);
+          if (countEl) countEl.innerText = items.length;
+
           const col = document.getElementById(`col${cap}`);
           col.innerHTML = '';
-          items.slice(-20).reverse().forEach(item => {
+          items.slice(-25).reverse().forEach(item => {
             const card = document.createElement('div');
             card.className = 'kanban-card';
+
+            const encUrl = encodeURIComponent(item.url || '');
+            const encTitle = encodeURIComponent(item.title || '');
+            const encCompany = encodeURIComponent(item.company || '');
+            const encNotes = encodeURIComponent(item.notes || '');
+
+            let interviewBadge = '';
+            let schedBtn = '';
+            if (st === 'interview') {
+              const dtMatch = (item.notes || '').match(/\[Jadwal:\s*([^\]]+)\]/);
+              const locMatch = (item.notes || '').match(/\[Lokasi:\s*([^\]]+)\]/);
+              if (dtMatch) {
+                interviewBadge = `<div style="font-size:0.75rem; color:var(--primary); margin-top:4px; font-weight:600;">📅 ${escapeHtml(dtMatch[1])}${locMatch ? ` (${escapeHtml(locMatch[1])})` : ''}</div>`;
+              }
+              schedBtn = `
+                <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:3px 8px;" onclick="openScheduleModal('${encUrl}', '${encTitle}', '${encCompany}', '${encNotes}')">📅 Jadwalkan</button>
+                  <a href="/api/job/export-ics?url=${encUrl}" class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:3px 8px;" title="Unduh file kalender .ics">📥 .ics</a>
+                </div>
+              `;
+            }
+
             card.innerHTML = `
-              <div class="kanban-card-title">${item.title || 'Posisi'}</div>
-              <div class="kanban-card-company">${item.company || 'Perusahaan'}</div>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">${item.timestamp || ''}</div>
-              ${item.notes ? `<div style="font-size: 0.75rem; color: var(--warning); margin-top: 4px;">📌 ${item.notes}</div>` : ''}
-              <select class="kanban-card-select" onchange="moveKanban('${item.url}', this.value)">
+              <div class="kanban-card-title">${escapeHtml(item.title || 'Posisi')}</div>
+              <div class="kanban-card-company">${escapeHtml(item.company || 'Perusahaan')}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(item.timestamp || '')}</div>
+              ${interviewBadge}
+              ${item.notes ? `<div style="font-size: 0.75rem; color: var(--warning); margin-top: 4px;">📌 ${escapeHtml(item.notes)}</div>` : ''}
+              ${schedBtn}
+              <select class="kanban-card-select" onchange="moveKanban('${encUrl}', this.value, '${encTitle}', '${encCompany}', '${encNotes}')">
                 <option value="applied" ${st === 'applied' ? 'selected' : ''}>Terkirim</option>
                 <option value="interview" ${st === 'interview' ? 'selected' : ''}>Interview</option>
                 <option value="offering" ${st === 'offering' ? 'selected' : ''}>Offering</option>
@@ -1285,8 +1434,17 @@
       }
     }
 
-    async function moveKanban(url, newStatus) {
-      const note = prompt('Catatan perkembangan (misal: Wawancara HR tgl 20 Nov):');
+    async function moveKanban(encUrl, newStatus, encTitle = '', encCompany = '', encNotes = '') {
+      const url = decodeURIComponent(encUrl);
+      if (newStatus === 'interview') {
+        openScheduleModal(encUrl, encTitle, encCompany, encNotes);
+        return;
+      }
+      const note = prompt('Catatan perkembangan (opsional):');
+      if (note === null) {
+        loadKanban();
+        return;
+      }
       try {
         await fetch('/api/status-update', {
           method: 'POST',
@@ -1295,7 +1453,201 @@
         });
         loadKanban();
         loadAnalytics();
+        fetchLogs();
       } catch (e) {}
+    }
+
+    /* RATE LIMIT QUOTA */
+    async function loadRateLimits() {
+      try {
+        const res = await fetch('/api/rate-limits');
+        const data = await res.json();
+        if (data.success && data.quotas) {
+          const q = data.quotas;
+          const b = document.getElementById('rateLimitBadge');
+          if (b) {
+            const js = q.jobstreet || { hour_count: 0, hour_limit: 15, day_count: 0, day_limit: 40 };
+            b.innerText = `🛡️ Kuota JS: ${js.hour_count}/${js.hour_limit} jam • ${js.day_count}/${js.day_limit} hari`;
+            b.title = `JobStreet: ${js.hour_count}/${js.hour_limit} jam, ${js.day_count}/${js.day_limit} hari\nGlints: ${(q.glints?.hour_count||0)}/${(q.glints?.hour_limit||15)} jam\nDealls: ${(q.dealls?.hour_count||0)}/${(q.dealls?.hour_limit||15)} jam\nMagangHub: ${(q.maganghub?.hour_count||0)}/${(q.maganghub?.hour_limit||10)} jam`;
+          }
+        }
+      } catch (e) {}
+    }
+
+    /* DIAGNOSTIC MODAL */
+    function openDiagnosticModal() {
+      document.getElementById('diagnosticModal').classList.add('active');
+      runDiagnosticCheck();
+    }
+    function closeDiagnosticModal() {
+      document.getElementById('diagnosticModal').classList.remove('active');
+    }
+    async function runDiagnosticCheck() {
+      const box = document.getElementById('diagnosticResultsBox');
+      box.innerHTML = '<span class="spinner"></span> Sedang menguji konektivitas portal dan status lingkungan...';
+      try {
+        const res = await fetch('/api/diagnostic/health');
+        const data = await res.json();
+        if (data.success && data.health) {
+          const h = data.health;
+          let portalRows = '';
+          for (const [pname, pinfo] of Object.entries(h.portals || {})) {
+            const isOk = pinfo.reachable;
+            portalRows += `
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>${pname.toUpperCase()}:</span>
+                <span style="color:${isOk ? 'var(--success)' : 'var(--danger)'}; font-weight:600;">
+                  ${isOk ? `✓ Terhubung (${pinfo.latency_ms} ms)` : `✗ Gangguan (${escapeHtml(pinfo.error || 'Timeout')})`}
+                </span>
+              </div>
+            `;
+          }
+          box.innerHTML = `
+            <div style="margin-bottom:8px; font-weight:700; color:var(--primary);">Konektivitas Portal Karir:</div>
+            ${portalRows}
+            <div style="margin-top:10px; border-top:1px solid var(--border); padding-top:8px; display:flex; flex-direction:column; gap:4px;">
+              <div><strong>Sistem Operasi:</strong> ${escapeHtml(h.os)} (Python ${escapeHtml(h.python_version)})</div>
+              <div><strong>Sesi Browser Profil:</strong> ${h.browser_session?.session_cookies_present ? '✓ Cookie Sesi Tersimpan' : 'Belum ada cookie (Silakan Login Portal Sekali)'}</div>
+              <div><strong>CV Aktif:</strong> ${h.active_cv?.ready ? `✓ Siap (${escapeHtml(h.active_cv.filename)})` : '✗ Belum ada file CV'}</div>
+              <div><strong>Database Lokal:</strong> ${h.database?.tampered ? '🚨 Ada Peringatan Keamanan' : '✓ Aman, Terenkripsi & Tersegel'}</div>
+            </div>
+          `;
+        }
+      } catch (e) {
+        box.innerHTML = `<span style="color:var(--danger);">Gagal menjalankan diagnosa: ${escapeHtml(e.message)}</span>`;
+      }
+    }
+
+    /* INTERVIEW MODAL & SCHEDULER */
+    let currentInterviewUrl = null;
+    function openScheduleModal(encUrl, encTitle, encCompany, encNotes) {
+      currentInterviewUrl = decodeURIComponent(encUrl);
+      const title = decodeURIComponent(encTitle || '');
+      const company = decodeURIComponent(encCompany || '');
+      const notes = decodeURIComponent(encNotes || '');
+
+      document.getElementById('interviewModalJobTitle').innerText = `${title} — ${company}`;
+
+      const matchDt = notes.match(/\[Jadwal:\s*([^\]]+)\]/);
+      if (matchDt) {
+        document.getElementById('interviewInputDateTime').value = matchDt[1].trim();
+      } else {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(10, 0, 0, 0);
+        const pad = n => n < 10 ? '0' + n : n;
+        const isoStr = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:${pad(tomorrow.getMinutes())}`;
+        document.getElementById('interviewInputDateTime').value = isoStr;
+      }
+
+      const matchLoc = notes.match(/\[Lokasi:\s*([^\]]+)\]/);
+      document.getElementById('interviewInputLocation').value = matchLoc ? matchLoc[1].trim() : '';
+
+      const cleanNotes = notes.replace(/\[(Jadwal|Lokasi):[^\]]+\]/g, '').trim();
+      document.getElementById('interviewInputNotes').value = cleanNotes;
+
+      document.getElementById('interviewModal').classList.add('active');
+    }
+
+    function closeInterviewModal() {
+      document.getElementById('interviewModal').classList.remove('active');
+      currentInterviewUrl = null;
+    }
+
+    async function saveInterviewSchedule() {
+      if (!currentInterviewUrl) return;
+      const dt = document.getElementById('interviewInputDateTime').value.trim();
+      const loc = document.getElementById('interviewInputLocation').value.trim();
+      const notes = document.getElementById('interviewInputNotes').value.trim();
+
+      try {
+        const res = await fetch('/api/job/set-interview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: currentInterviewUrl,
+            datetime: dt,
+            location: loc,
+            notes: notes
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeInterviewModal();
+          loadKanban();
+          loadAnalytics();
+          fetchLogs();
+        }
+      } catch (e) {
+        alert('Gagal menyimpan jadwal interview: ' + e.message);
+      }
+    }
+
+    /* UNANSWERED QUESTIONS AUTO-LEARNING BANK */
+    function showUnansweredQuestionsModal(questions) {
+      if (!questions || !questions.length) return;
+      const list = document.getElementById('qaQuestionsList');
+      list.innerHTML = '';
+      questions.forEach((q, idx) => {
+        const row = document.createElement('div');
+        row.style.background = '#0b1120';
+        row.style.border = '1px solid var(--border)';
+        row.style.borderRadius = '8px';
+        row.style.padding = '10px 12px';
+
+        const qText = q.question || q.keyword || 'Pertanyaan';
+        const kwText = q.keyword || qText.slice(0, 15);
+
+        row.innerHTML = `
+          <div style="font-weight:600; font-size:0.85rem; color:#fff; margin-bottom:4px;">
+            ❓ ${escapeHtml(qText)}
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <input type="text" id="qaInput_${idx}" placeholder="Jawaban Anda (misal: Ya / S1 / 2 tahun)" style="flex:1; padding:6px 10px; font-size:0.85rem;">
+            <button class="btn btn-primary btn-sm" onclick="saveAnswerToBank('${escapeHtml(kwText)}', '${escapeHtml(qText)}', 'qaInput_${idx}', this)">💾 Simpan</button>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+      document.getElementById('qaModal').classList.add('active');
+    }
+
+    function closeQaModal() {
+      document.getElementById('qaModal').classList.remove('active');
+    }
+
+    async function saveAnswerToBank(keyword, question, inputId, btnEl) {
+      const val = document.getElementById(inputId).value.trim();
+      if (!val) {
+        alert('Harap isi jawaban sebelum menyimpan.');
+        return;
+      }
+      btnEl.disabled = true;
+      btnEl.innerText = 'Menyimpan...';
+      try {
+        const res = await fetch('/api/qa/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            keyword: keyword || question.slice(0, 20),
+            question: question,
+            answer: val
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          btnEl.innerText = '✓ Tersimpan';
+          btnEl.classList.remove('btn-primary');
+          btnEl.classList.add('btn-success');
+          loadConfig();
+        } else {
+          btnEl.innerText = 'Gagal';
+          btnEl.disabled = false;
+        }
+      } catch (e) {
+        btnEl.innerText = 'Error';
+        btnEl.disabled = false;
+      }
     }
 
     /* COVER LETTER MODAL */
@@ -1520,6 +1872,7 @@
     loadCVList();
     fetchLogs();
     refreshBrowserStatus();
+    loadRateLimits();
     checkAppUpdate(false);
   </script>
 </body>

@@ -130,9 +130,11 @@ class DeallsHunter(BaseJobHunter):
             self._switch_to_latest_tab_if_opened(pages_before)
 
             if self._is_login_redirect() or self.page.locator("input[type='password'], text='Masuk ke Dealls', text='Sign in to Dealls'").first.is_visible(timeout=1000):
+                shot = self._capture_failure_screenshot("dealls", "login_required")
                 return {
                     "status": "login_required",
                     "message": "Akun Dealls belum login. Silakan login di jendela browser yang terbuka, lalu selesaikan lamaran.",
+                    "screenshot": shot,
                 }
 
             confirm_before_submit = bool(self.config.get("screening_defaults", {}).get("confirm_before_submit", False))
@@ -159,9 +161,12 @@ class DeallsHunter(BaseJobHunter):
                 confirm_btn = self.page.locator("button:has-text('Kirim Lamaran'), button:has-text('Kirim'), button:has-text('Submit')").first
                 if confirm_btn.is_visible(timeout=1800) and confirm_btn.is_enabled():
                     if confirm_before_submit:
+                        shot = self._capture_failure_screenshot("dealls", "review_pause")
                         return {
                             "status": "manual_action_needed",
                             "message": "Form Dealls sudah diisi! Silakan cek di jendela browser dan klik 'Kirim', lalu konfirmasi di dashboard.",
+                            "screenshot": shot,
+                            "unanswered_questions": self.screener.last_unanswered,
                         }
                     confirm_btn.click()
                     human_delay(2, 3)
@@ -174,9 +179,13 @@ class DeallsHunter(BaseJobHunter):
                     continue
                 break
 
+            shot = self._capture_failure_screenshot("dealls", "manual_action")
             return {
                 "status": "manual_action_needed",
                 "message": "Silakan konfirmasi resume dan pertanyaan di jendela browser Dealls yang terbuka.",
+                "screenshot": shot,
+                "unanswered_questions": self.screener.last_unanswered,
             }
         except Exception as e:
-            return {"status": "error", "message": f"Terjadi kesalahan di Dealls: {str(e)}"}
+            shot = self._capture_failure_screenshot("dealls", "error")
+            return {"status": "error", "message": f"Terjadi kesalahan di Dealls: {str(e)}", "screenshot": shot}

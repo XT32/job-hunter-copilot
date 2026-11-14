@@ -16,6 +16,27 @@ class ScreeningAutoFiller:
         }
         self.last_unanswered = []
 
+    def _record_unanswered(self, question_text: str, field_type: str = "text"):
+        if not question_text:
+            return
+        clean = re.sub(r"\s+", " ", question_text).strip()
+        if not clean or len(clean) < 3:
+            return
+        for item in self.last_unanswered:
+            q = item.get("question", "") if isinstance(item, dict) else str(item)
+            if clean in q or q in clean:
+                return
+        words = [
+            w for w in re.findall(r"[a-zA-Z0-9]{3,}", clean.lower())
+            if w not in {"apa", "apakah", "berapa", "kapan", "dimana", "mohon", "silakan", "input", "wajib", "select", "pilih", "anda"}
+        ]
+        suggested_kw = words[0] if words else clean[:15].strip()
+        self.last_unanswered.append({
+            "question": clean[:100],
+            "type": field_type,
+            "suggested_keyword": suggested_kw,
+        })
+
     def _safe_attr(self, el, name: str) -> str:
         try:
             val = el.get_attribute(name)
@@ -202,7 +223,7 @@ class ScreeningAutoFiller:
                         inp.fill(str(ans))
                         filled_count += 1
                     elif self._safe_attr(inp, "required") != "" or "*" in q_text:
-                        self.last_unanswered.append(q_text[:80] or "Input teks wajib")
+                        self._record_unanswered(q_text or "Pertanyaan teks wajib", "text")
                 except Exception:
                     pass
 
@@ -219,9 +240,9 @@ class ScreeningAutoFiller:
                         if self._pick_best_select_option(sel, ans):
                             filled_count += 1
                         else:
-                            self.last_unanswered.append(q_text[:80] or "Dropdown wajib")
+                            self._record_unanswered(q_text or "Pilihan dropdown wajib", "select")
                     elif not current_val:
-                        self.last_unanswered.append(q_text[:80] or "Pilihan dropdown belum dipilih")
+                        self._record_unanswered(q_text or "Pilihan dropdown belum dipilih", "select")
                 except Exception:
                     pass
 
@@ -281,7 +302,7 @@ class ScreeningAutoFiller:
                                 break
 
                     if not clicked:
-                        self.last_unanswered.append(grp_text.splitlines()[0][:80] if grp_text else "Pilihan radio")
+                        self._record_unanswered(grp_text.splitlines()[0] if grp_text else "Pilihan radio", "radio")
                 except Exception:
                     pass
 

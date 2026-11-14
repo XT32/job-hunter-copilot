@@ -136,9 +136,11 @@ class GlintsHunter(BaseJobHunter):
             # 4. Cek apakah muncul modal/halaman login Glints
             login_modal = self.page.locator("input[type='password'], button:has-text('Masuk dengan Google'), text='Masuk ke Glints'").first
             if self._is_login_redirect() or (login_modal.is_visible(timeout=1200) and not self.page.locator("button:has-text('Kirim Lamaran')").first.is_visible(timeout=500)):
+                shot = self._capture_failure_screenshot("glints", "login_required")
                 return {
                     "status": "login_required",
                     "message": "Akun Glints belum login. Silakan login di jendela browser yang tetap terbuka, lalu selesaikan lamaran.",
+                    "screenshot": shot,
                 }
 
             confirm_before_submit = bool(self.config.get("screening_defaults", {}).get("confirm_before_submit", False))
@@ -167,9 +169,12 @@ class GlintsHunter(BaseJobHunter):
                 confirm_btn = self.page.locator("button:has-text('Kirim Lamaran'), button:has-text('Kirim'), button:has-text('Submit')").first
                 if confirm_btn.is_visible(timeout=1800) and confirm_btn.is_enabled():
                     if confirm_before_submit:
+                        shot = self._capture_failure_screenshot("glints", "review_pause")
                         return {
                             "status": "manual_action_needed",
                             "message": "Form Glints sudah diisi! Silakan cek di jendela browser dan klik 'Kirim Lamaran', lalu konfirmasi di dashboard.",
+                            "screenshot": shot,
+                            "unanswered_questions": self.screener.last_unanswered,
                         }
                     confirm_btn.click()
                     human_delay(2, 3)
@@ -182,9 +187,17 @@ class GlintsHunter(BaseJobHunter):
                     continue
                 break
 
+            shot = self._capture_failure_screenshot("glints", "manual_action")
             return {
                 "status": "manual_action_needed",
                 "message": "Muncul form/pertanyaan tambahan khusus di Glints. Silakan lengkapi langsung di jendela browser yang terbuka.",
+                "screenshot": shot,
+                "unanswered_questions": self.screener.last_unanswered,
             }
         except Exception as e:
-            return {"status": "error", "message": f"Terjadi kesalahan teknis di Glints: {str(e)}"}
+            shot = self._capture_failure_screenshot("glints", "error")
+            return {
+                "status": "error",
+                "message": f"Terjadi kesalahan teknis di Glints: {str(e)}",
+                "screenshot": shot,
+            }

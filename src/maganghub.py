@@ -129,9 +129,11 @@ class MagangHubHunter(BaseJobHunter):
             self._switch_to_latest_tab_if_opened(pages_before)
 
             if self._is_login_redirect() or self._page_has_text(["masuk siapkerja", "login siapkerja", "nik / email"]):
+                shot = self._capture_failure_screenshot("maganghub", "login_required")
                 return {
                     "status": "login_required",
                     "message": "Akun SIAPkerja Kemnaker belum login. Silakan login di jendela browser yang terbuka, lalu selesaikan pendaftaran.",
+                    "screenshot": shot,
                 }
 
             self._upload_active_cv_if_present()
@@ -142,17 +144,24 @@ class MagangHubHunter(BaseJobHunter):
             confirm_btn = self.page.locator("button:has-text('Kirim'), button:has-text('Konfirmasi'), button:has-text('Ya, Daftar')").first
             if confirm_btn.is_visible(timeout=2500) and confirm_btn.is_enabled():
                 if confirm_before_submit:
+                    shot = self._capture_failure_screenshot("maganghub", "review_pause")
                     return {
                         "status": "manual_action_needed",
                         "message": "Silakan cek berkas MagangHub di browser yang terbuka dan klik Konfirmasi/Daftar.",
+                        "screenshot": shot,
+                        "unanswered_questions": self.screener.last_unanswered,
                     }
                 confirm_btn.click()
                 human_delay(2, 3)
                 return {"status": "success", "message": "Pendaftaran program magang berhasil dikirim via MagangHub!"}
 
+            shot = self._capture_failure_screenshot("maganghub", "manual_action")
             return {
                 "status": "manual_action_needed",
                 "message": "Muncul verifikasi berkas SIAPkerja (Pakta Integritas / Surat Rekomendasi). Silakan lengkapi di jendela browser yang terbuka.",
+                "screenshot": shot,
+                "unanswered_questions": self.screener.last_unanswered,
             }
         except Exception as e:
-            return {"status": "error", "message": f"Terjadi kesalahan di MagangHub: {str(e)}"}
+            shot = self._capture_failure_screenshot("maganghub", "error")
+            return {"status": "error", "message": f"Terjadi kesalahan di MagangHub: {str(e)}", "screenshot": shot}

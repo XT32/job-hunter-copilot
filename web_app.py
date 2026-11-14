@@ -1,10 +1,12 @@
 import json
 import os
+import secrets
 import sys
 import threading
 import time
 import webbrowser
-from flask import Flask, render_template, request, jsonify, send_file
+from urllib.parse import urlparse
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory
 from werkzeug.utils import secure_filename
 from playwright.sync_api import sync_playwright
 
@@ -21,6 +23,8 @@ from src.storage import (
     get_analytics_summary,
     verify_database_integrity,
     acknowledge_legacy_hashes,
+    set_interview_schedule,
+    generate_interview_ics,
 )
 from src.local_db import get_default_db, TamperDetectedError
 from src.config import load_config, save_config, DEFAULT_CONFIG
@@ -32,10 +36,38 @@ from src.scheduler import AutoHuntScheduler
 from src.scam_detector import check_for_red_flags
 from src.salary_guide import suggest_salary_range
 from src.updater import check_for_updates, apply_update, get_local_version_info
+from src.rate_limiter import get_limiter
+from src.diagnostic import check_system_health, generate_debug_bundle
 
 app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # Maksimal 10 MB untuk upload CV
 playwright_lock = threading.Lock()
+
+SERVER_CSRF_TOKEN = secrets.token_hex(24)
+
+
+@app.before_request
+def csrf_and_origin_protect():
+    """
+    Melindungi dashboard UI-first dari serangan Cross-Site Request Forgery (CSRF)
+    dan eksekusi permintaan lintas domain berbahaya.
+    """
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        # 1. Periksa header Origin / Referer jika ada
+        origin = request.headers.get("Origin") or request.headers.get("Referer")
+        if origin:
+            try:
+                parsed = urlparse(origin)
+                allowed_hosts = ("127.0.0.1", "localhost", "0.0.0.0")
+                if parsed.hostname not in allowed_hosts:
+                    return jsonify({"success": False, "error": "Akses ditolak: Permintaan lintas domain dilarang."}), 403
+            except Exception:
+                return jsonify({"success": False, "error": "Origin header tidak valid."}), 403
+
+        # 2. Periksa header X-CSRF-Token
+        token = request.headers.get("X-CSRF-Token")
+        if not token or not secrets.compare_digest(token, SERVER_CSRF_TOKEN):
+            return jsonify({"success": False, "error": "Token keamanan CSRF tidak valid atau sesi kadaluarsa."}), 403
 
 
 @app.errorhandler(413)
@@ -88,7 +120,12 @@ LOGIN_PORTAL_URLS = {
     "dealls": "https://dealls.com",
 }
 
-scheduler = AutoHuntScheduler(HUNTER_MAP, load_config)
+scheduler = AutoHuntScheduler(
+    HUNTER_MAP,
+    load_config,
+    log_callback=add_log,
+    playwright_lock=playwright_lock,
+)
 
 
 class InteractiveBrowserSession:
@@ -270,7 +307,12 @@ browser_session = InteractiveBrowserSession()
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", csrf_token=SERVER_CSRF_TOKEN)
+
+
+@app.route("/api/csrf-token", methods=["GET"])
+def get_csrf_token():
+    return jsonify({"csrf_token": SERVER_CSRF_TOKEN})
 
 
 # ================= DATABASE SECURITY & TAMPER ENDPOINTS =================
@@ -474,6 +516,10 @@ def complete_manual_apply():
 
     if job_url:
         record_job(job_url, title, company, status="applied", notes=f"Selesai via Browser Copilot ({platform_name})", source="ui")
+        try:
+            get_limiter().record_application(platform)
+        except Exception:
+            pass
         add_log(f"Lamaran '{title}' di {company} dikonfirmasi terkirim & dicatat ke Kanban.", "success")
 
     browser_session.close()
@@ -573,6 +619,18 @@ def apply_job():
     if not job_url:
         return jsonify({"success": False, "error": "URL lowongan wajib disertakan"}), 400
 
+    # Lindungi akun dari shadowban/blokir via safe rate limiter
+    limiter = get_limiter()
+    allowed, quota_reason, quota_stats = limiter.check_quota(platform)
+    if not allowed:
+        add_log(f"BATAS AMAN KUOTA TERCAPAI: {quota_reason}", "warning")
+        return jsonify({
+            "success": False,
+            "rate_limited": True,
+            "error": quota_reason,
+            "quota_stats": quota_stats,
+        }), 429
+
     cfg = load_config()
     _, platform_name = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
 
@@ -581,22 +639,26 @@ def apply_job():
     try:
         result = browser_session.run_apply_with_handoff(platform, job_url, title, company, cfg)
 
-        if result["status"] == "success":
+        if result.get("status") == "success":
             record_job(job_url, title, company, status="applied", notes=f"Lamar via {platform_name}", source="ui")
+            limiter.record_application(platform)
             add_log(f"Lamaran '{title}' di {company} berhasil terkirim!", "success")
-        elif result["status"] == "already_applied":
+        elif result.get("status") == "already_applied":
             record_job(job_url, title, company, status="applied", notes=f"Sudah dilamar sebelumnya ({platform_name})", source="ui")
             add_log(f"Lowongan '{title}' di {company} ternyata sudah pernah dilamar.", "warning")
-        elif result["status"] == "external_link":
+        elif result.get("status") == "external_link":
             record_job(job_url, title, company, status="skipped", notes=f"Tautan eksternal ({platform_name})", source="ui")
             add_log(f"Lowongan '{title}' di {company} dialihkan ke web karir eksternal.", "info")
-        elif result["status"] in ("manual_action_needed", "login_required"):
-            add_log(f"Browser dibiarkan terbuka untuk '{title}': {result['message']}", "warning")
+        elif result.get("status") in ("manual_action_needed", "login_required"):
+            add_log(f"Browser dibiarkan terbuka untuk '{title}': {result.get('message')}", "warning")
 
         return jsonify({
             "success": True,
             "result": result,
             "browser": browser_session.get_status(),
+            "unanswered_questions": result.get("unanswered_questions", []),
+            "screenshot": result.get("screenshot"),
+            "quota_stats": limiter.check_quota(platform)[2],
         })
     except TamperDetectedError:
         raise
@@ -746,6 +808,132 @@ def download_backup():
         json.dump(backup_data, f, indent=2, ensure_ascii=False)
     add_log("Cadangan data JSON diunduh pengguna.", "info")
     return send_file(backup_path, mimetype="application/json", as_attachment=True, download_name="backup_loker_cli.json")
+
+
+# ================= RATE LIMITS & QUOTA =================
+@app.route("/api/rate-limits", methods=["GET"])
+def api_rate_limits():
+    return jsonify({"success": True, "quotas": get_limiter().get_all_quotas()})
+
+
+# ================= DIAGNOSTIC & DEBUG BUNDLE =================
+@app.route("/api/diagnostic/health", methods=["GET"])
+def api_diagnostic_health():
+    res = check_system_health(config_loader=load_config, db_verifier=verify_database_integrity)
+    return jsonify({"success": True, "health": res})
+
+
+@app.route("/api/diagnostic/bundle", methods=["GET"])
+def api_diagnostic_bundle():
+    with logs_lock:
+        recent_logs = list(system_logs)
+    cfg = load_config()
+    db_stat = verify_database_integrity()
+    bundle_path = generate_debug_bundle(logs=recent_logs, cfg=cfg, db_status=db_stat)
+    add_log("Berkas diagnosa (loker_debug_bundle.zip) dibuat dan siap diunduh.", "info")
+    return send_file(
+        bundle_path,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="loker_debug_bundle.zip",
+    )
+
+
+# ================= SCREENSHOTS VIEWER =================
+@app.route("/api/screenshots/<path:filename>", methods=["GET"])
+def api_get_screenshot(filename):
+    safe_name = os.path.basename(filename)
+    screenshots_dir = os.path.join(os.path.dirname(__file__), "data", "screenshots")
+    return send_from_directory(screenshots_dir, safe_name)
+
+
+# ================= SCREENING Q&A BANK =================
+@app.route("/api/qa", methods=["GET"])
+def api_get_qa():
+    cfg = load_config()
+    qas = cfg.get("screening_defaults", {}).get("custom_qa", [])
+    return jsonify({"success": True, "custom_qa": qas})
+
+
+@app.route("/api/qa/save", methods=["POST"])
+def api_save_qa():
+    data = request.json or {}
+    keyword = str(data.get("keyword", "")).strip()
+    answer = str(data.get("answer", "")).strip()
+    question = str(data.get("question", "")).strip()
+
+    if not keyword or not answer:
+        return jsonify({"success": False, "error": "Kata kunci (keyword) dan jawaban wajib diisi."}), 400
+
+    cfg = load_config()
+    if "screening_defaults" not in cfg:
+        cfg["screening_defaults"] = {}
+    if "custom_qa" not in cfg["screening_defaults"] or not isinstance(cfg["screening_defaults"]["custom_qa"], list):
+        cfg["screening_defaults"]["custom_qa"] = []
+
+    qas = cfg["screening_defaults"]["custom_qa"]
+    updated = False
+    for item in qas:
+        if isinstance(item, dict) and item.get("keyword", "").lower() == keyword.lower():
+            item["answer"] = answer
+            if question:
+                item["question"] = question
+            updated = True
+            break
+    if not updated:
+        entry = {"keyword": keyword, "answer": answer}
+        if question:
+            entry["question"] = question
+        qas.append(entry)
+
+    cfg["screening_defaults"]["custom_qa"] = qas
+    save_config(cfg, source="ui")
+    add_log(f"Jawaban untuk kata kunci '{keyword}' disimpan ke Bank Jawaban Otomatis.", "success")
+    return jsonify({"success": True, "custom_qa": qas})
+
+
+@app.route("/api/qa/delete", methods=["POST"])
+def api_delete_qa():
+    data = request.json or {}
+    keyword = str(data.get("keyword", "")).strip().lower()
+    cfg = load_config()
+    qas = cfg.get("screening_defaults", {}).get("custom_qa", [])
+    new_qas = [item for item in qas if isinstance(item, dict) and item.get("keyword", "").lower() != keyword]
+    cfg["screening_defaults"]["custom_qa"] = new_qas
+    save_config(cfg, source="ui")
+    add_log(f"Kata kunci '{keyword}' dihapus dari Bank Jawaban.", "info")
+    return jsonify({"success": True, "custom_qa": new_qas})
+
+
+# ================= INTERVIEW SCHEDULING & ICALENDAR (.ICS) =================
+@app.route("/api/job/set-interview", methods=["POST"])
+def api_set_interview():
+    data = request.json or {}
+    job_url = data.get("url")
+    interview_datetime = data.get("datetime", "")
+    location = data.get("location", "")
+    notes = data.get("notes", "")
+
+    if not job_url:
+        return jsonify({"success": False, "error": "URL lowongan wajib diisi."}), 400
+
+    success = set_interview_schedule(job_url, interview_datetime, location=location, notes=notes, source="ui")
+    if success:
+        add_log("Jadwal interview dicatat & status dipindahkan ke tahap Interview.", "success")
+    return jsonify({"success": success})
+
+
+@app.route("/api/job/export-ics", methods=["GET"])
+def api_export_ics():
+    job_url = request.args.get("url")
+    ics_path = generate_interview_ics(job_url=job_url)
+    add_log("Jadwal wawancara diekspor ke format kalender iCalendar (.ics).", "info")
+    return send_file(
+        ics_path,
+        mimetype="text/calendar",
+        as_attachment=True,
+        download_name="jadwal_interview.ics",
+    )
 
 
 # ================= 1-CLICK APP UPDATE (GITHUB) =================

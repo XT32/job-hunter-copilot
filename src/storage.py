@@ -1,7 +1,9 @@
 import csv
+import datetime
 import hashlib
 import json
 import os
+import re
 import time
 from src.local_db import LocalSecureDB, DEFAULT_DB_PATH, TamperDetectedError
 
@@ -202,3 +204,116 @@ def get_analytics_summary(hist=None) -> dict:
         "response_rate": response_rate,
         "platforms": platforms,
     }
+
+
+def set_interview_schedule(job_url: str, interview_datetime: str, location: str = "", notes: str = "", source: str = "ui") -> bool:
+    """
+    Menetapkan jadwal interview pada item lamaran dan memperbarui status menjadi 'interview'.
+    Format catatan terstruktur: [Jadwal: YYYY-MM-DDTHH:MM] [Lokasi: ...] Catatan
+    """
+    prefix_parts = []
+    if interview_datetime:
+        prefix_parts.append(f"[Jadwal: {interview_datetime.strip()}]")
+    if location:
+        prefix_parts.append(f"[Lokasi: {location.strip()}]")
+
+    full_notes = " ".join(prefix_parts)
+    if notes:
+        full_notes = f"{full_notes} {notes.strip()}".strip()
+
+    return update_job_status(job_url, "interview", notes=full_notes, source=source)
+
+
+def generate_interview_ics(job_url: str = None, output_path: str = None) -> str:
+    """
+    Menghasilkan file kalender RFC 5545 (.ics) untuk jadwal interview kerja.
+    Bisa diekspor untuk satu lamaran tertentu atau seluruh jadwal interview di pipeline.
+    """
+    hist = load_history()
+    interviews = hist.get("interview", [])
+
+    if job_url:
+        interviews = [item for item in interviews if item.get("url") == job_url]
+
+    now_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Job Hunter Copilot//ID",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "X-WR-CALNAME:Jadwal Interview Loker",
+    ]
+
+    for idx, item in enumerate(interviews):
+        notes_str = item.get("notes", "") or ""
+        # Cari [Jadwal: ...]
+        match_dt = re.search(r"\[Jadwal:\s*([^\]]+)\]", notes_str)
+        # Cari [Lokasi: ...]
+        match_loc = re.search(r"\[Lokasi:\s*([^\]]+)\]", notes_str)
+
+        raw_dt = match_dt.group(1).strip() if match_dt else ""
+        location = match_loc.group(1).strip() if match_loc else ""
+
+        # Parse datetime
+        dt_start = None
+        if raw_dt:
+            for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                try:
+                    dt_start = datetime.datetime.strptime(raw_dt, fmt)
+                    break
+                except ValueError:
+                    pass
+
+        if not dt_start:
+            # Fallback ke timestamp pencatatan + 1 hari jam 09:00
+            try:
+                base_dt = datetime.datetime.strptime(item.get("timestamp", ""), "%Y-%m-%d %H:%M:%S")
+                dt_start = base_dt.replace(hour=9, minute=0, second=0) + datetime.timedelta(days=1)
+            except Exception:
+                dt_start = datetime.datetime.now() + datetime.timedelta(days=1)
+
+        dt_end = dt_start + datetime.timedelta(hours=1)
+
+        title = item.get("title") or "Wawancara Kerja"
+        company = item.get("company") or "Perusahaan"
+        url = item.get("url") or ""
+
+        clean_notes = re.sub(r"\[(Jadwal|Lokasi):[^\]]+\]", "", notes_str).strip()
+        desc = f"Wawancara posisi {title} di {company}.\\nTautan: {url}"
+        if clean_notes:
+            desc += f"\\nCatatan: {clean_notes}"
+
+        uid_raw = f"{url}_{idx}_{dt_start.strftime('%Y%m%d%H%M')}"
+        uid = hashlib.md5(uid_raw.encode("utf-8")).hexdigest()
+
+        lines.extend([
+            "BEGIN:VEVENT",
+            f"UID:{uid}@jobhuntercopilot",
+            f"DTSTAMP:{now_utc}",
+            f"DTSTART:{dt_start.strftime('%Y%m%dT%H%M%S')}",
+            f"DTEND:{dt_end.strftime('%Y%m%dT%H%M%S')}",
+            f"SUMMARY:Interview {title} - {company}",
+            f"DESCRIPTION:{desc}",
+        ])
+        if location:
+            lines.append(f"LOCATION:{location}")
+        lines.extend([
+            "STATUS:CONFIRMED",
+            "END:VEVENT",
+        ])
+
+    lines.append("END:VCALENDAR")
+    ics_content = "\r\n".join(lines) + "\r\n"
+
+    if not output_path:
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+        os.makedirs(data_dir, exist_ok=True)
+        output_path = os.path.join(data_dir, "jadwal_interview.ics")
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(ics_content)
+
+    return output_path
+

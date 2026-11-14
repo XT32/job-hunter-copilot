@@ -1,4 +1,5 @@
 import os
+import time
 from abc import ABC, abstractmethod
 from src.browser import human_delay
 
@@ -87,3 +88,15 @@ class BaseJobHunter(ABC):
             return any(tok in current_url for tok in ["login.seek.com", "/login", "signin", "sign-in", "account.kemnaker.go.id"])
         except Exception:
             return False
+
+    def _capture_failure_screenshot(self, platform_name: str = "portal", status: str = "failed") -> str:
+        """Menyimpan tangkapan layar otomatis jika proses melamar terhambat atau butuh konfirmasi manual"""
+        try:
+            screenshots_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "screenshots")
+            os.makedirs(screenshots_dir, exist_ok=True)
+            filename = f"{platform_name.lower().replace(' ', '_')}_{int(time.time())}_{status}.png"
+            target_path = os.path.join(screenshots_dir, filename)
+            self.page.screenshot(path=target_path, timeout=3000)
+            return filename
+        except Exception:
+            return ""

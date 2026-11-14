@@ -26,9 +26,14 @@ data/.*.key
 data/.*.seal
 data/.*.snapshot
 data/.legacy_hashes.json
+data/.rate_limits.json
 data/*.csv
+data/*.ics
+data/*.zip
+data/screenshots/
 data/backup_*.json
 *.log
+.proxy_port
 
 # Environment variables
 .env
