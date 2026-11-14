@@ -1,5 +1,7 @@
+import copy
 import json
 import os
+from src.local_db import LocalSecureDB, DEFAULT_DB_PATH, TamperDetectedError
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
 
@@ -10,17 +12,30 @@ DEFAULT_CONFIG = {
         "experience_level": "fresh_graduate",
         "work_type": "all",
         "preferred_locations": ["Jakarta", "Remote"],
-        "blacklist_keywords": ["Senior", "Lead", "Manager", "Head of", "Director", "SPG", "Sales Lapangan", "Asuransi", "Canvasser"],
+        "blacklist_keywords": [
+            "Senior",
+            "Lead",
+            "Manager",
+            "Head of",
+            "Director",
+            "SPG",
+            "Sales Lapangan",
+            "Asuransi",
+            "Canvasser",
+        ],
         "applicant_name": "Nama Lengkap Kamu",
-        "contact_info": "+62 812-xxxx-xxxx | linkedin.com/in/username"
+        "contact_info": "+62 812-xxxx-xxxx | linkedin.com/in/username",
     },
     "screening_defaults": {
         "expected_salary": "6000000",
         "notice_period": "Immediately",
         "years_of_experience": "1",
+        "education_level": "S1",
         "willing_to_wfo": True,
         "willing_to_relocate": True,
-        "domicile": "Jakarta"
+        "domicile": "Jakarta",
+        "confirm_before_submit": False,
+        "custom_qa": [],
     },
     "smtp": {
         "host": "smtp.gmail.com",
@@ -28,36 +43,66 @@ DEFAULT_CONFIG = {
         "email": "",
         "password": "",
         "sender_name": "",
-        "cv_path": "attachments/CV.pdf"
+        "cv_path": "attachments/CV.pdf",
     },
     "telegram": {
         "bot_token": "",
         "chat_id": "",
-        "enabled": False
+        "enabled": False,
     },
     "country": "ID",
     "min_delay_sec": 2,
     "max_delay_sec": 4,
     "auto_skip_already_seen": True,
-    "slow_mo_ms": 150
+    "slow_mo_ms": 150,
 }
 
-def load_config(file_path=DEFAULT_CONFIG_PATH):
-    if not os.path.exists(file_path):
-        save_config(DEFAULT_CONFIG, file_path)
-        return DEFAULT_CONFIG.copy()
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            # Ensure new keys are populated if upgrading from older config
-            for key, val in DEFAULT_CONFIG.items():
-                if key not in data:
-                    data[key] = val
-            return data
-    except Exception:
-        return DEFAULT_CONFIG.copy()
 
-def save_config(cfg, file_path=DEFAULT_CONFIG_PATH):
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2, ensure_ascii=False)
+def _merge_defaults(data: dict) -> dict:
+    merged = copy.deepcopy(DEFAULT_CONFIG)
+    if not isinstance(data, dict):
+        return merged
+    for key, val in data.items():
+        if isinstance(val, dict) and isinstance(merged.get(key), dict):
+            merged[key].update(val)
+        else:
+            merged[key] = val
+    return merged
+
+
+def _get_config_db(file_path=DEFAULT_CONFIG_PATH) -> LocalSecureDB:
+    if os.path.abspath(file_path) == os.path.abspath(DEFAULT_CONFIG_PATH):
+        db = LocalSecureDB(DEFAULT_DB_PATH)
+    else:
+        db = LocalSecureDB(file_path)
+    db.ensure_initialized()
+    return db
+
+
+def load_config(file_path=DEFAULT_CONFIG_PATH):
+    db = _get_config_db(file_path)
+    try:
+        stored = db.get_config("main_config")
+        if stored is not None:
+            return _merge_defaults(stored)
+
+        # Migrasi satu kali jika file config.json lama masih ada
+        initial = copy.deepcopy(DEFAULT_CONFIG)
+        if os.path.abspath(file_path) == os.path.abspath(DEFAULT_CONFIG_PATH) and os.path.exists(DEFAULT_CONFIG_PATH):
+            try:
+                with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as f:
+                    initial = _merge_defaults(json.load(f))
+            except Exception:
+                pass
+        db.save_config(initial, key_name="main_config", source="system_migration")
+        return initial
+    except TamperDetectedError:
+        raise
+    except Exception:
+        return copy.deepcopy(DEFAULT_CONFIG)
+
+
+def save_config(cfg, file_path=DEFAULT_CONFIG_PATH, source="ui"):
+    db = _get_config_db(file_path)
+    merged = _merge_defaults(cfg)
+    db.save_config(merged, key_name="main_config", source=source)

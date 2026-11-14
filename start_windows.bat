@@ -1,9 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
-title loker-cli Launcher (Windows)
+title loker-copilot Web Dashboard (UI-First)
 
 echo =========================================================
-echo       LOKER-CLI AUTO SETUP & LAUNCHER (WINDOWS)
+echo     LOKER-COPILOT WEB DASHBOARD (UI-FIRST / WINDOWS)     
 echo =========================================================
 echo.
 
@@ -31,25 +31,10 @@ echo [*] Memeriksa modul dan browser Playwright...
 pip install -r requirements.txt --quiet
 playwright install chromium
 
-:: 5. Pilihan Tampilan
+:: 5. Langsung jalankan Web UI (UI-First)
 echo.
-echo =========================================================
-echo                PILIH MODE TAMPILAN
-echo =========================================================
-echo [1] Web Dashboard (Tampilan Visual di Browser - Sangat Mudah)
-echo [2] Terminal CLI  (Mode Teks Cepat di Terminal)
-echo.
-set /p user_choice="Pilih mode [1 atau 2, tekan ENTER untuk Web]: "
-
-if "%user_choice%"=="2" (
-    echo.
-    echo [*] Memulai Terminal CLI...
-    python main.py
-) else (
-    echo.
-    echo [*] Membuka Web Dashboard di browser (http://127.0.0.1:5000)...
-    python web_app.py
-)
+echo [*] Membuka Web Dashboard di browser (http://127.0.0.1:5000)...
+python web_app.py
 
 if %errorlevel% neq 0 (
     echo.

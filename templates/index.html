@@ -109,40 +109,109 @@
 </head>
 <body>
   <div class="container">
+    <!-- SECURITY TAMPER WARNING BANNER -->
+    <div id="tamperAlertBanner" style="display:none; background:rgba(239,68,68,0.18); border:1px solid var(--danger); border-radius:10px; padding:16px; margin-bottom:18px;">
+      <div style="font-weight:700; color:#fca5a5; font-size:1rem; margin-bottom:6px;">
+        🚨 PERINGATAN KEAMANAN: Terdeteksi Pengubahan File Database di Luar Web UI!
+      </div>
+      <div id="tamperAlertReason" style="font-size:0.85rem; color:#fecaca; margin-bottom:12px;"></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="restoreDatabaseSnapshot()">🛡️ Pulihkan Snapshot Sah Terakhir</button>
+        <button class="btn btn-danger btn-sm" onclick="resetDatabaseViaUI()">🔄 Reset & Segel Ulang DB via UI</button>
+      </div>
+    </div>
+
+    <div id="legacyWarningBanner" style="display:none; background:rgba(245,158,11,0.15); border:1px solid var(--warning); border-radius:10px; padding:14px; margin-bottom:18px;">
+      <div style="font-weight:700; color:#fcd34d; font-size:0.95rem; margin-bottom:4px;">
+        ⚠️ Peringatan: File Konfigurasi/JSON Lama Diubah Langsung
+      </div>
+      <div id="legacyWarningText" style="font-size:0.85rem; color:#fde68a; margin-bottom:10px;"></div>
+      <button class="btn btn-secondary btn-sm" onclick="ackLegacyWarning()">Mengerti & Tutup Peringatan</button>
+    </div>
+
     <header>
       <div>
-        <div class="brand">loker-cli Dashboard</div>
+        <div class="brand">loker-copilot Dashboard <span style="font-size:0.75rem; font-weight:500; color:var(--text-muted);">(UI-First Local DB)</span></div>
         <div class="tagline">Platform Karir & Magang (Glints, JobStreet, MagangHub, Dealls)</div>
       </div>
-      <div style="display: flex; gap: 10px; align-items: center;">
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <span class="badge" id="dbSecurityBadge" style="color: var(--success); border-color: rgba(34,197,94,0.4);">🔒 DB Lokal: Memeriksa...</span>
         <span class="badge" id="activeProfileBadge">Profil: Memuat...</span>
         <span class="badge" id="activeCVBadge" style="color: var(--primary);">CV Aktif: Memuat...</span>
+        <button class="btn btn-secondary btn-sm" id="btnHeaderUpdate" onclick="openUpdateModal()" title="Cek & perbarui aplikasi langsung dari GitHub">🔄 Cek Update</button>
         <a href="/api/backup" class="btn btn-secondary btn-sm" title="Unduh cadangan data JSON">💾 Backup</a>
       </div>
     </header>
 
     <div class="nav-tabs">
-      <button class="tab-btn active" onclick="switchTab('huntTab')">🔍 Berburu Loker & Magang</button>
-      <button class="tab-btn" onclick="switchTab('cvTab')">📄 Kelola CV (${activeCVCount || '0'})</button>
-      <button class="tab-btn" onclick="switchTab('kanbanTab')">📋 Papan Pelacak & Statistik</button>
-      <button class="tab-btn" onclick="switchTab('emailTab')">✉️ Cold Email HRD</button>
-      <button class="tab-btn" onclick="switchTab('profileTab')">⚙️ Profil & Standar Gaji UMR</button>
+      <button class="tab-btn active" id="navBtnHunt" onclick="switchTab('huntTab', this)">🔍 Berburu Loker & Magang</button>
+      <button class="tab-btn" id="navBtnCv" onclick="switchTab('cvTab', this)">📄 Kelola CV (<span id="cvTabCount">0</span>)</button>
+      <button class="tab-btn" id="navBtnKanban" onclick="switchTab('kanbanTab', this)">📋 Papan Pelacak & Statistik</button>
+      <button class="tab-btn" id="navBtnEmail" onclick="switchTab('emailTab', this)">✉️ Cold Email HRD</button>
+      <button class="tab-btn" id="navBtnProfile" onclick="switchTab('profileTab', this)">⚙️ Profil, Q&A & Keamanan DB</button>
     </div>
 
     <!-- TAB 1: HUNT & REVIEW -->
     <div id="huntTab" class="tab-content active">
+      <!-- PANDUAN CEPAT PEMULA (3 LANGKAH MUDAH) -->
+      <div class="card" id="quickStartCard" style="padding:14px 18px; background:linear-gradient(135deg, #162032, #1b283f); border-color:#334155;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <span style="font-weight:700; font-size:0.95rem; color:#fff;">🧭 Panduan Cepat (3 Langkah Sebelum Melamar)</span>
+          <span style="font-size:0.75rem; color:var(--text-muted);">Cukup ikuti urutan 1 → 2 → 3</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
+          <div style="background:#0f172a; border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div>
+              <div style="font-size:0.8rem; font-weight:700; color:#fff;">1. Unggah File CV (PDF)</div>
+              <div id="stepCvStatus" style="font-size:0.75rem; color:var(--warning);">Memeriksa...</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('cvTab', document.getElementById('navBtnCv'))">Buka CV</button>
+          </div>
+          <div style="background:#0f172a; border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div>
+              <div style="font-size:0.8rem; font-weight:700; color:#fff;">2. Isi Nama & Target Kerja</div>
+              <div id="stepProfileStatus" style="font-size:0.75rem; color:var(--warning);">Memeriksa...</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('profileTab', document.getElementById('navBtnProfile'))">Isi Profil</button>
+          </div>
+          <div style="background:#0f172a; border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div>
+              <div style="font-size:0.8rem; font-weight:700; color:#fff;">3. Login Portal (Sekali Saja)</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">Agar sesi akun tersimpan</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openLoginBrowser()">🔑 Login</button>
+          </div>
+        </div>
+      </div>
+      <!-- ACTIVE INTERACTIVE BROWSER BAR -->
+      <div id="activeBrowserBar" style="display:none; background:rgba(56,189,248,0.12); border:1px solid var(--primary); border-radius:10px; padding:14px; margin-bottom:18px; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div style="font-weight:700; color:var(--primary); font-size:0.95rem;" id="activeBrowserTitle">🌐 Jendela Browser Copilot Sedang Terbuka</div>
+          <div style="font-size:0.8rem; color:var(--text-muted);" id="activeBrowserSubtitle">Selesaikan login atau pengisian form di jendela browser, lalu konfirmasi di sini.</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-success btn-sm" id="btnCompleteApplyBar" onclick="completeActiveBrowserApply()" style="display:none;">✅ Sudah Saya Kirim & Tutup Browser</button>
+          <button class="btn btn-danger btn-sm" onclick="closeActiveBrowser()">❌ Tutup Browser</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">Pindai Lowongan / Program Magang</div>
-        <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
-          <div class="form-group" style="flex: 1; min-width: 250px; margin-bottom: 0;">
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+          <div class="form-group" style="flex: 1; min-width: 210px; margin-bottom: 0;">
             <label>Pilih Platform Sasaran</label>
             <select id="platformSelect">
-              <option value="glints">Glints Indonesia</option>
               <option value="jobstreet">JobStreet Indonesia (SEEK)</option>
+              <option value="glints">Glints Indonesia</option>
               <option value="maganghub">MagangHub Kemnaker (Program Magang Nasional)</option>
               <option value="dealls">Dealls Jobs Indonesia</option>
             </select>
           </div>
+          <div class="form-group" style="flex: 1.4; min-width: 220px; margin-bottom: 0;">
+            <label>Kata Kunci Cepat (Opsional)</label>
+            <input type="text" id="scanKeywords" placeholder="Contoh: PPIC Staff (kosongkan = pakai profil)">
+          </div>
+          <button class="btn btn-secondary" onclick="openLoginBrowser()" title="Buka browser Copilot untuk login akun portal">🔑 Login Portal</button>
           <button class="btn btn-primary" id="btnScan" onclick="startScan()">
             <span id="scanBtnText">🔍 Mulai Pindai Sekarang</span>
           </button>
@@ -316,15 +385,40 @@
           <label>Kata Kunci Posisi yang Dicari (Pisahkan koma)</label>
           <input type="text" id="cfgKeywords" placeholder="Contoh: Staff Akuntansi, Finance Staff">
         </div>
-        <div class="form-group">
-          <label>Tingkat Pengalaman</label>
-          <select id="cfgExp" onchange="checkSalaryRecommendation()">
-            <option value="fresh_graduate">Fresh Graduate (0 tahun)</option>
-            <option value="junior">Junior (1 - 2 tahun)</option>
-            <option value="mid">Mid-Level (3 - 4 tahun)</option>
-            <option value="senior">Senior (5+ tahun)</option>
-            <option value="all">Semua Level</option>
-          </select>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tingkat Pengalaman</label>
+            <select id="cfgExp" onchange="checkSalaryRecommendation()">
+              <option value="fresh_graduate">Fresh Graduate (0 tahun)</option>
+              <option value="junior">Junior (1 - 2 tahun)</option>
+              <option value="mid">Mid-Level (3 - 4 tahun)</option>
+              <option value="senior">Senior (5+ tahun)</option>
+              <option value="all">Semua Level</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Pendidikan Terakhir</label>
+            <select id="cfgEducation">
+              <option value="SMA/SMK">SMA / SMK</option>
+              <option value="D3">Diploma (D3)</option>
+              <option value="S1">Sarjana (S1 / D4)</option>
+              <option value="S2">Magister (S2)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Lokasi Kerja Pilihan (Pisahkan koma)</label>
+            <input type="text" id="cfgLocations" placeholder="Jakarta, Bekasi, Karawang, Remote">
+          </div>
+          <div class="form-group">
+            <label>Tipe Kerja</label>
+            <select id="cfgWorkType">
+              <option value="all">Semua (WFO / Hybrid / Remote)</option>
+              <option value="onsite">Onsite / WFO</option>
+              <option value="remote">Remote</option>
+            </select>
+          </div>
         </div>
         <div class="form-group">
           <label>Kata Kunci Terlarang (Blacklist — Pisahkan koma)</label>
@@ -333,7 +427,7 @@
       </div>
 
       <div class="card">
-        <div class="card-title">2. Jawaban Otomatis Form Screening & Panduan Gaji UMR</div>
+        <div class="card-title">2. Jawaban Otomatis Form Screening, Wizard JobStreet & Panduan Gaji UMR</div>
         <div class="form-row">
           <div class="form-group">
             <label>Kota / Domisili Saat Ini</label>
@@ -363,6 +457,27 @@
             <input type="text" id="cfgYears" placeholder="1">
           </div>
         </div>
+
+        <div class="form-group">
+          <label>Bank Jawaban Pertanyaan Perusahaan (Format: <code>kata kunci = jawaban</code> per baris)</label>
+          <textarea id="cfgCustomQA" rows="4" placeholder="ppic = Ya&#10;excel = Ya&#10;sap = Ya&#10;shift = Ya&#10;sim a = Tidak"></textarea>
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+            Dipakai otomatis saat menjawab pertanyaan perusahaan di wizard JobStreet/Glints.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="cfgConfirmSubmit" style="width: auto;">
+            Berhenti di halaman "Review dan kirim" JobStreet agar saya bisa cek dulu sebelum dikirim (Browser tetap terbuka)
+          </label>
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="cfgAutoSkip" style="width: auto;">
+            Otomatis lewati lowongan yang sudah pernah dilamar/dilihat
+          </label>
+        </div>
       </div>
 
       <div class="card">
@@ -385,7 +500,43 @@
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="saveAllSettings()">💾 Simpan Semua Pengaturan</button>
+      <button class="btn btn-primary" onclick="saveAllSettings()" style="margin-bottom:20px;">💾 Simpan Semua Pengaturan ke Database Lokal</button>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div class="card-title" style="margin-bottom:0;">4. Keamanan Database Lokal (UI-Only & Anti-Tamper)</div>
+          <button class="btn btn-secondary btn-sm" onclick="checkSecurityStatus()">🔍 Cek Integritas Sekarang</button>
+        </div>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+          Semua data disimpan di database SQLite lokal terenkripsi dan disegel HMAC-SHA256. Pengubahan file langsung di luar UI akan terdeteksi dan memicu peringatan keamanan.
+        </p>
+        <div id="securityStatusBox" style="font-size:0.85rem; padding:12px; background:#0b1120; border:1px solid var(--border); border-radius:8px; margin-bottom:12px;">
+          Memeriksa status keamanan database...
+        </div>
+        <div class="terminal-box" id="securityAuditBox" style="max-height:140px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL UPDATE APLIKASI 1-KLIK -->
+  <div class="modal-overlay" id="updateModal">
+    <div class="modal">
+      <div class="card-title">🔄 Pembaruan Aplikasi Otomatis (Dari GitHub)</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        Perbarui program tanpa perlu membuka GitHub atau mengulang dari awal. <strong>CV, profil, sesi login browser, dan riwayat lamaran kamu aman dan tidak akan terhapus.</strong>
+      </p>
+      <div id="updateInfoBox" style="background:#0b1120; border:1px solid var(--border); border-radius:8px; padding:12px; font-size:0.85rem; margin-bottom:15px;">
+        Memeriksa versi terbaru di GitHub...
+      </div>
+      <div id="updateProgressBox" style="display:none; font-size:0.85rem; margin-bottom:15px;"></div>
+      <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="closeUpdateModal()">Tutup</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="checkAppUpdate(true)">🔍 Cek Ulang</button>
+          <button class="btn btn-primary" id="btnDoUpdate" onclick="applyAppUpdate()" style="display:none;">⬇️ Update Sekarang</button>
+          <button class="btn btn-success" id="btnRestartApp" onclick="restartAppAfterUpdate()" style="display:none;">🔄 Restart Aplikasi Sekarang</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -419,16 +570,118 @@
     let recommendedMinSalary = 5000000;
     let logInterval = null;
 
-    function switchTab(tabId) {
+    let activeManualJob = null;
+
+    function switchTab(tabId, btnEl) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
+      if (btnEl) btnEl.classList.add('active');
       if (tabId === 'kanbanTab') {
         loadKanban();
         loadAnalytics();
       }
       if (tabId === 'cvTab') loadCVList();
+      if (tabId === 'profileTab') checkSecurityStatus();
+    }
+
+    /* SECURITY & TAMPER MONITORING */
+    function renderSecurityState(sec) {
+      if (!sec) return;
+      const badge = document.getElementById('dbSecurityBadge');
+      const tamperBanner = document.getElementById('tamperAlertBanner');
+      const legacyBanner = document.getElementById('legacyWarningBanner');
+      const statusBox = document.getElementById('securityStatusBox');
+      const auditBox = document.getElementById('securityAuditBox');
+
+      if (sec.tampered) {
+        badge.innerText = '🚨 DB Dimanipulasi!';
+        badge.style.color = '#fca5a5';
+        badge.style.borderColor = 'var(--danger)';
+        tamperBanner.style.display = 'block';
+        document.getElementById('tamperAlertReason').innerText =
+          sec.reason || 'File database diubah di luar Web UI.';
+      } else {
+        badge.innerText = '🔒 DB Lokal: Aman (UI-Only)';
+        badge.style.color = 'var(--success)';
+        badge.style.borderColor = 'rgba(34,197,94,0.4)';
+        tamperBanner.style.display = 'none';
+      }
+
+      if (sec.legacy_file_warning) {
+        legacyBanner.style.display = 'block';
+        document.getElementById('legacyWarningText').innerText = sec.legacy_file_warning;
+      } else {
+        legacyBanner.style.display = 'none';
+      }
+
+      if (statusBox) {
+        statusBox.innerHTML = sec.tampered
+          ? `<span style="color:var(--danger); font-weight:700;">[PERINGATAN] ${sec.reason}</span><br><span style="color:var(--text-muted); font-size:0.8rem;">Lokasi: ${sec.db_path}</span>`
+          : `<span style="color:var(--success); font-weight:700;">[✓] Integritas Database Lokal Terverifikasi</span><br><span style="color:var(--text-muted); font-size:0.8rem;">Lokasi: ${sec.db_path} | Snapshot cadangan tersedia: ${sec.has_snapshot ? 'Ya' : 'Belum'}</span>`;
+      }
+
+      if (auditBox && Array.isArray(sec.audit_logs)) {
+        auditBox.innerHTML = sec.audit_logs.length
+          ? sec.audit_logs.map(a => `<div class="log-entry log-${a.event_type.includes('TAMPER') ? 'danger' : 'info'}">[${a.event_time}] [${a.event_type}] ${a.detail}</div>`).join('')
+          : '<div class="log-entry log-info">Belum ada log audit keamanan.</div>';
+      }
+    }
+
+    async function checkSecurityStatus() {
+      try {
+        const res = await fetch('/api/security/status');
+        const data = await res.json();
+        if (data.security) renderSecurityState(data.security);
+      } catch (e) {}
+    }
+
+    async function restoreDatabaseSnapshot() {
+      try {
+        const res = await fetch('/api/security/restore', { method: 'POST' });
+        const data = await res.json();
+        if (data.security) renderSecurityState(data.security);
+        if (data.success) {
+          alert(data.message);
+          loadConfig();
+          loadCVList();
+          fetchLogs();
+        } else {
+          alert('Gagal memulihkan snapshot: ' + (data.message || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Gagal menghubungi server.');
+      }
+    }
+
+    async function resetDatabaseViaUI() {
+      if (!confirm('Reset database lokal ke pengaturan awal dan segel ulang via UI?')) return;
+      try {
+        const res = await fetch('/api/security/reset', { method: 'POST' });
+        const data = await res.json();
+        if (data.security) renderSecurityState(data.security);
+        alert(data.message || 'Database di-reset.');
+        loadConfig();
+        loadCVList();
+        fetchLogs();
+      } catch (e) {}
+    }
+
+    async function ackLegacyWarning() {
+      try {
+        const res = await fetch('/api/security/ack-legacy', { method: 'POST' });
+        const data = await res.json();
+        if (data.security) renderSecurityState(data.security);
+      } catch (e) {}
+    }
+
+    function handleApiTamperResponse(data) {
+      if (data && data.tamper_alert) {
+        renderSecurityState(data.security_status || { tampered: true, reason: data.error });
+        alert('🚨 PERINGATAN KEAMANAN:\n' + data.error);
+        return true;
+      }
+      return false;
     }
 
     async function fetchLogs() {
@@ -443,36 +696,87 @@
       } catch (e) {}
     }
 
+    function parseCustomQAText(text) {
+      return text.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+        const idx = line.indexOf('=');
+        if (idx === -1) return null;
+        return { keyword: line.slice(0, idx).trim(), answer: line.slice(idx + 1).trim() };
+      }).filter(item => item && item.keyword && item.answer);
+    }
+
+    function formatCustomQAText(list) {
+      if (!Array.isArray(list)) return '';
+      return list.map(i => `${i.keyword} = ${i.answer}`).join('\n');
+    }
+
     async function loadConfig() {
       try {
         const res = await fetch('/api/config');
-        currentConfig = await res.json();
+        const data = await res.json();
+        if (handleApiTamperResponse(data)) return;
+        currentConfig = data;
         const prof = currentConfig.profile || {};
         const scr = currentConfig.screening_defaults || {};
         const tg = currentConfig.telegram || {};
-        
+
         document.getElementById('cfgName').value = prof.applicant_name || '';
         document.getElementById('cfgContact').value = prof.contact_info || '';
         document.getElementById('cfgMajor').value = prof.field_or_major || '';
         document.getElementById('cfgKeywords').value = (prof.target_keywords || []).join(', ');
         document.getElementById('cfgExp').value = prof.experience_level || 'fresh_graduate';
+        document.getElementById('cfgLocations').value = (prof.preferred_locations || []).join(', ');
+        document.getElementById('cfgWorkType').value = prof.work_type || 'all';
         document.getElementById('cfgBlacklist').value = (prof.blacklist_keywords || []).join(', ');
 
         document.getElementById('cfgSalary').value = scr.expected_salary || '6000000';
         document.getElementById('cfgNotice').value = scr.notice_period || 'Immediately';
         document.getElementById('cfgYears').value = scr.years_of_experience || '1';
+        document.getElementById('cfgEducation').value = scr.education_level || 'S1';
         document.getElementById('cfgDomicile').value = scr.domicile || 'Jakarta';
+        document.getElementById('cfgCustomQA').value = formatCustomQAText(scr.custom_qa);
+        document.getElementById('cfgConfirmSubmit').checked = !!scr.confirm_before_submit;
+        document.getElementById('cfgAutoSkip').checked = currentConfig.auto_skip_already_seen !== false;
 
         document.getElementById('cfgTgToken').value = tg.bot_token || '';
         document.getElementById('cfgTgChat').value = tg.chat_id || '';
         document.getElementById('cfgTgEnabled').checked = !!tg.enabled;
-        
-        document.getElementById('activeProfileBadge').innerText = 
+
+        document.getElementById('activeProfileBadge').innerText =
           `${prof.field_or_major || 'Umum'} (${prof.experience_level || 'all'})`;
 
+        updateQuickStartChecklist();
         checkSalaryRecommendation();
       } catch (e) {
         console.error('Gagal memuat config:', e);
+      }
+    }
+
+    function updateQuickStartChecklist() {
+      const profEl = document.getElementById('stepProfileStatus');
+      const cvEl = document.getElementById('stepCvStatus');
+      if (profEl && currentConfig) {
+        const prof = currentConfig.profile || {};
+        const name = (prof.applicant_name || '').trim();
+        const kws = prof.target_keywords || [];
+        if (!name || name === 'Nama Lengkap Kamu') {
+          profEl.style.color = 'var(--warning)';
+          profEl.innerText = '⚠️ Nama masih default — klik Isi Profil';
+        } else if (kws.length === 0) {
+          profEl.style.color = 'var(--warning)';
+          profEl.innerText = '⚠️ Target posisi masih kosong';
+        } else {
+          profEl.style.color = 'var(--success)';
+          profEl.innerText = `✅ Siap (${name})`;
+        }
+      }
+      if (cvEl) {
+        if (activeCVCount > 0) {
+          cvEl.style.color = 'var(--success)';
+          cvEl.innerText = `✅ ${activeCVCount} file CV siap`;
+        } else {
+          cvEl.style.color = 'var(--warning)';
+          cvEl.innerText = '⚠️ Belum ada CV PDF — unggah dulu';
+        }
       }
     }
 
@@ -483,7 +787,7 @@
         const res = await fetch(`/api/salary-guide?location=${encodeURIComponent(loc)}&exp=${encodeURIComponent(exp)}`);
         const guide = await res.json();
         recommendedMinSalary = guide.recommended_min;
-        document.getElementById('salaryGuideText').innerHTML = 
+        document.getElementById('salaryGuideText').innerHTML =
           `Rentang wajar <strong>${guide.formatted_range}</strong> (UMR ${guide.location}: Rp ${guide.umr.toLocaleString('id-ID')})`;
       } catch (e) {}
     }
@@ -500,6 +804,8 @@
         field_or_major: document.getElementById('cfgMajor').value.trim(),
         target_keywords: document.getElementById('cfgKeywords').value.split(',').map(s => s.trim()).filter(Boolean),
         experience_level: document.getElementById('cfgExp').value,
+        preferred_locations: document.getElementById('cfgLocations').value.split(',').map(s => s.trim()).filter(Boolean),
+        work_type: document.getElementById('cfgWorkType').value,
         blacklist_keywords: document.getElementById('cfgBlacklist').value.split(',').map(s => s.trim()).filter(Boolean)
       };
 
@@ -507,9 +813,12 @@
         expected_salary: document.getElementById('cfgSalary').value.trim(),
         notice_period: document.getElementById('cfgNotice').value.trim(),
         years_of_experience: document.getElementById('cfgYears').value.trim(),
+        education_level: document.getElementById('cfgEducation').value,
         domicile: document.getElementById('cfgDomicile').value.trim(),
         willing_to_wfo: true,
-        willing_to_relocate: true
+        willing_to_relocate: true,
+        confirm_before_submit: document.getElementById('cfgConfirmSubmit').checked,
+        custom_qa: parseCustomQAText(document.getElementById('cfgCustomQA').value)
       };
 
       const tg = {
@@ -522,12 +831,19 @@
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profile: prof, screening_defaults: scr, telegram: tg })
+          body: JSON.stringify({
+            profile: prof,
+            screening_defaults: scr,
+            telegram: tg,
+            auto_skip_already_seen: document.getElementById('cfgAutoSkip').checked
+          })
         });
         const data = await res.json();
+        if (handleApiTamperResponse(data)) return;
         if (data.success) {
-          alert('Semua pengaturan berhasil disimpan!');
+          alert('Semua pengaturan berhasil disimpan ke database lokal!');
           loadConfig();
+          checkSecurityStatus();
         }
       } catch (e) {
         alert('Terjadi kesalahan saat menyimpan pengaturan.');
@@ -542,9 +858,12 @@
         const data = await res.json();
         const cvs = data.cvs || [];
         activeCVCount = cvs.length;
-        
-        document.getElementById('activeCVBadge').innerText = 
+        const countSpan = document.getElementById('cvTabCount');
+        if (countSpan) countSpan.innerText = activeCVCount;
+
+        document.getElementById('activeCVBadge').innerText =
           data.active_cv ? `CV: ${data.active_cv}` : 'Belum ada CV';
+        updateQuickStartChecklist();
 
         if (cvs.length === 0) {
           container.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted);">Belum ada file CV yang diunggah. Silakan unggah CV pertama kamu di form bawah.</div>';
@@ -630,9 +949,112 @@
       }
     }
 
-    /* SCANNING & JOB SEARCH */
+    /* INTERACTIVE BROWSER & SCANNING */
+    function renderBrowserBar(browser) {
+      const bar = document.getElementById('activeBrowserBar');
+      const completeBtn = document.getElementById('btnCompleteApplyBar');
+      if (browser && browser.active) {
+        const meta = browser.meta || {};
+        bar.style.display = 'flex';
+        if (meta.mode === 'apply_handoff') {
+          document.getElementById('activeBrowserTitle').innerText = `🌐 Browser Terbuka: ${meta.title || 'Lowongan'} @ ${meta.company || ''}`;
+          document.getElementById('activeBrowserSubtitle').innerText = 'Lengkapi tahap dokumen/pertanyaan/kirim di jendela browser, lalu klik "Sudah Saya Kirim" di sini.';
+          completeBtn.style.display = 'inline-flex';
+          activeManualJob = meta;
+        } else {
+          document.getElementById('activeBrowserTitle').innerText = `🔑 Browser Copilot Terbuka (${meta.label || 'Portal'})`;
+          document.getElementById('activeBrowserSubtitle').innerText = 'Silakan login di jendela browser yang terbuka, lalu tutup browser saat sudah selesai.';
+          completeBtn.style.display = 'none';
+          activeManualJob = null;
+        }
+      } else {
+        bar.style.display = 'none';
+        activeManualJob = null;
+      }
+    }
+
+    async function refreshBrowserStatus() {
+      try {
+        const res = await fetch('/api/browser/status');
+        const data = await res.json();
+        renderBrowserBar(data.browser);
+      } catch (e) {}
+    }
+
+    async function openLoginBrowser() {
+      const platform = document.getElementById('platformSelect').value;
+      fetchLogs();
+      try {
+        const res = await fetch('/api/browser/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: platform })
+        });
+        const data = await res.json();
+        if (handleApiTamperResponse(data)) return;
+        if (data.success) {
+          renderBrowserBar(data.browser);
+          fetchLogs();
+        } else {
+          alert('Gagal membuka browser: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Gagal membuka jendela browser.');
+      }
+    }
+
+    async function openJobInCopilotBrowser(index) {
+      const job = foundJobs[index];
+      const platform = document.getElementById('platformSelect').value;
+      try {
+        const res = await fetch('/api/browser/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: platform, url: job.url, label: job.title })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderBrowserBar(data.browser);
+          fetchLogs();
+        }
+      } catch (e) {}
+    }
+
+    async function closeActiveBrowser() {
+      try {
+        await fetch('/api/browser/close', { method: 'POST' });
+        renderBrowserBar({ active: false });
+        fetchLogs();
+      } catch (e) {}
+    }
+
+    async function completeActiveBrowserApply(jobOverride) {
+      const target = jobOverride || activeManualJob;
+      if (!target) {
+        await closeActiveBrowser();
+        return;
+      }
+      try {
+        const res = await fetch('/api/browser/complete-apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platform: target.platform || document.getElementById('platformSelect').value,
+            url: target.url,
+            title: target.title,
+            company: target.company
+          })
+        });
+        const data = await res.json();
+        if (handleApiTamperResponse(data)) return;
+        renderBrowserBar({ active: false });
+        fetchLogs();
+      } catch (e) {}
+    }
+
     async function startScan() {
       const platform = document.getElementById('platformSelect').value;
+      const keywords = document.getElementById('scanKeywords').value.trim();
       const btn = document.getElementById('btnScan');
       const status = document.getElementById('scanStatus');
       const container = document.getElementById('jobsContainer');
@@ -650,16 +1072,22 @@
         const res = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ platform: platform })
+          body: JSON.stringify({ platform: platform, keywords: keywords || null })
         });
         const data = await res.json();
+        if (handleApiTamperResponse(data)) {
+          status.innerText = '[!] Pemindaian diblokir oleh peringatan keamanan database.';
+          return;
+        }
 
         if (data.success && data.jobs && data.jobs.length > 0) {
           foundJobs = data.jobs;
           status.innerText = `[✓] Ditemukan ${foundJobs.length} lowongan cocok!`;
           renderJobs();
         } else {
-          status.innerText = `[-] Tidak ada lowongan baru yang cocok di ${platform.toUpperCase()} saat ini.`;
+          status.innerText = data.error
+            ? `[x] Gagal memindai: ${data.error}`
+            : `[-] Tidak ada lowongan baru yang cocok di ${platform.toUpperCase()} saat ini.`;
         }
       } catch (e) {
         status.innerText = `[x] Kendala saat memindai: ${e.message || 'Koneksi terputus'}`;
@@ -669,6 +1097,7 @@
         clearInterval(logInterval);
         logInterval = null;
         fetchLogs();
+        refreshBrowserStatus();
       }
     }
 
@@ -680,7 +1109,7 @@
         const card = document.createElement('div');
         card.className = 'job-card';
         card.id = `job-${index}`;
-        
+
         const ats = job.ats || { score: 70, status: 'Sedang' };
         const atsScoreBadge = `<span class="badge badge-ats">🎯 ATS Match: ${ats.score}% (${ats.status})</span>`;
 
@@ -711,9 +1140,9 @@
           </div>
           <div class="job-actions">
             <button class="btn btn-success btn-sm" onclick="applyJob(${index})">✅ Lamar Otomatis</button>
+            <button class="btn btn-primary btn-sm" onclick="openJobInCopilotBrowser(${index})">🌐 Buka di Browser Copilot</button>
             <button class="btn btn-purple btn-sm" onclick="openCoverLetterModal(${index})">📄 Cover Letter</button>
             <button class="btn btn-secondary btn-sm" onclick="skipJob(${index})">⏭️ Lewati</button>
-            <a href="${job.url}" target="_blank" class="btn btn-secondary btn-sm">🔗 Buka Link</a>
           </div>
         `;
         container.appendChild(card);
@@ -725,9 +1154,9 @@
       const platform = document.getElementById('platformSelect').value;
       const card = document.getElementById(`job-${index}`);
 
-      card.style.opacity = '0.5';
+      card.style.opacity = '0.75';
       const actions = card.querySelector('.job-actions');
-      actions.innerHTML = '<span style="font-size: 0.85rem; color: var(--primary);">⏳ Sedang melamar & mengisi auto-screening...</span>';
+      actions.innerHTML = '<span style="font-size: 0.85rem; color: var(--primary);">⏳ Membuka browser & mengisi langkah lamaran...</span>';
 
       try {
         const res = await fetch('/api/apply', {
@@ -741,13 +1170,50 @@
           })
         });
         const data = await res.json();
+        if (handleApiTamperResponse(data)) {
+          card.style.opacity = '1';
+          actions.innerHTML = `<span style="color: var(--danger); font-size: 0.85rem;">[!] Diblokir karena peringatan keamanan DB.</span>`;
+          return;
+        }
+        renderBrowserBar(data.browser);
+        fetchLogs();
+
         if (data.success && data.result.status === 'success') {
+          card.style.opacity = '1';
           actions.innerHTML = '<span style="color: var(--success); font-weight: 600;">[✓] Lamaran Berhasil Terkirim!</span>';
+        } else if (data.success && (data.result.status === 'manual_action_needed' || data.result.status === 'login_required')) {
+          card.style.opacity = '1';
+          actions.innerHTML = `
+            <div style="width:100%; display:flex; flex-direction:column; gap:8px;">
+              <span style="color: var(--warning); font-size: 0.85rem;">[!] ${data.result.message}</span>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-success btn-sm" onclick="markCardApplied(${index})">✅ Sudah Saya Kirim & Tutup Browser</button>
+                <button class="btn btn-secondary btn-sm" onclick="applyJob(${index})">🔄 Coba Jalankan Ulang</button>
+              </div>
+            </div>
+          `;
         } else {
-          actions.innerHTML = `<span style="color: var(--warning); font-size: 0.85rem;">[!] ${data.result ? data.result.message : 'Selesaikan di browser'}</span>`;
+          card.style.opacity = '1';
+          actions.innerHTML = `<span style="color: var(--warning); font-size: 0.85rem;">[!] ${data.result ? data.result.message : (data.error || 'Selesaikan di browser')}</span>`;
         }
       } catch (e) {
+        card.style.opacity = '1';
         actions.innerHTML = '<span style="color: var(--danger); font-size: 0.85rem;">[x] Gagal mengirim</span>';
+      }
+    }
+
+    async function markCardApplied(index) {
+      const job = foundJobs[index];
+      const platform = document.getElementById('platformSelect').value;
+      await completeActiveBrowserApply({
+        platform: platform,
+        url: job.url,
+        title: job.title,
+        company: job.company
+      });
+      const card = document.getElementById(`job-${index}`);
+      if (card) {
+        card.querySelector('.job-actions').innerHTML = '<span style="color: var(--success); font-weight: 600;">[✓] Lamaran Dicatat Terkirim!</span>';
       }
     }
 
@@ -897,10 +1363,18 @@
       window.open(gmailUrl, '_blank');
       
       // Catat ke history pipeline
-      fetch('/api/status-update', {
+      const role = document.getElementById('emailRole').value.trim() || 'Cold Email';
+      const company = document.getElementById('emailCompany').value.trim() || to;
+      fetch('/api/record-manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: `mailto:${to}`, status: 'applied', notes: 'Draft Gmail Web 1-Klik' })
+        body: JSON.stringify({
+          url: `mailto:${to}`,
+          title: role,
+          company: company,
+          status: 'applied',
+          notes: 'Draft Gmail Web 1-Klik'
+        })
       }).catch(() => {});
     }
 
@@ -954,9 +1428,99 @@
       }
     }
 
+    /* 1-CLICK APP UPDATE (GITHUB) */
+    function openUpdateModal() {
+      document.getElementById('updateModal').classList.add('active');
+      checkAppUpdate(false);
+    }
+
+    function closeUpdateModal() {
+      document.getElementById('updateModal').classList.remove('active');
+    }
+
+    async function checkAppUpdate(verbose = false) {
+      const box = document.getElementById('updateInfoBox');
+      const btnDo = document.getElementById('btnDoUpdate');
+      const headerBtn = document.getElementById('btnHeaderUpdate');
+      if (box) box.innerHTML = '<span style="color:var(--primary);">⏳ Menghubungi GitHub untuk mengecek versi terbaru...</span>';
+
+      try {
+        const res = await fetch('/api/update/check');
+        const data = await res.json();
+        if (!data.success) {
+          if (box) box.innerHTML = `<span style="color:var(--warning);">[!] ${data.error}</span>`;
+          return;
+        }
+        const localSha = (data.local && data.local.sha) ? data.local.sha.slice(0, 7) : 'Belum tercatat';
+        const remote = data.remote || {};
+        if (data.up_to_date) {
+          if (box) {
+            box.innerHTML = `<span style="color:var(--success); font-weight:700;">[✓] Aplikasi kamu sudah versi terbaru!</span><br><span style="color:var(--text-muted); font-size:0.8rem;">Versi terpasang: ${localSha} | Terakhir di GitHub: ${remote.message || '-'}</span>`;
+          }
+          if (btnDo) btnDo.style.display = verbose ? 'inline-flex' : 'none';
+          if (headerBtn) {
+            headerBtn.innerText = '🔄 Cek Update';
+            headerBtn.className = 'btn btn-secondary btn-sm';
+          }
+        } else {
+          if (box) {
+            box.innerHTML = `<span style="color:var(--primary); font-weight:700;">✨ Pembaruan Tersedia!</span><br>Versi lokal: <code>${localSha}</code> → Terbaru di GitHub: <code>${remote.short_sha || 'main'}</code><br><span style="color:#fff;">Catatan update: ${remote.message || 'Perbaikan terbaru'}</span>`;
+          }
+          if (btnDo) btnDo.style.display = 'inline-flex';
+          if (headerBtn) {
+            headerBtn.innerText = '✨ Update Tersedia';
+            headerBtn.className = 'btn btn-primary btn-sm';
+          }
+        }
+      } catch (e) {
+        if (box) box.innerHTML = '<span style="color:var(--danger);">[x] Gagal mengecek update.</span>';
+      }
+    }
+
+    async function applyAppUpdate() {
+      const btnDo = document.getElementById('btnDoUpdate');
+      const prog = document.getElementById('updateProgressBox');
+      const btnRestart = document.getElementById('btnRestartApp');
+
+      btnDo.disabled = true;
+      btnDo.innerHTML = '<span class="spinner"></span> Mengunduh Update...';
+      prog.style.display = 'block';
+      prog.innerHTML = '<span style="color:var(--primary);">⏳ Sedang mengunduh dan memasang pembaruan dari GitHub (data CV & riwayat kamu aman)...</span>';
+
+      try {
+        const res = await fetch('/api/update/apply', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          prog.innerHTML = `<span style="color:var(--success); font-weight:700;">[✓] ${data.message}</span>`;
+          btnDo.style.display = 'none';
+          btnRestart.style.display = 'inline-flex';
+          fetchLogs();
+        } else {
+          prog.innerHTML = `<span style="color:var(--danger);">[x] ${data.error}</span>`;
+        }
+      } catch (e) {
+        prog.innerHTML = '<span style="color:var(--danger);">[x] Koneksi terputus saat memperbarui aplikasi.</span>';
+      } finally {
+        btnDo.disabled = false;
+        btnDo.innerText = '⬇️ Update Sekarang';
+      }
+    }
+
+    async function restartAppAfterUpdate() {
+      const prog = document.getElementById('updateProgressBox');
+      prog.innerHTML = '<span style="color:var(--primary);">🔄 Memuat ulang aplikasi... Halaman akan refresh otomatis dalam 3 detik.</span>';
+      try {
+        await fetch('/api/update/restart', { method: 'POST' });
+      } catch (e) {}
+      setTimeout(() => { window.location.reload(); }, 3000);
+    }
+
+    checkSecurityStatus();
     loadConfig();
     loadCVList();
     fetchLogs();
+    refreshBrowserStatus();
+    checkAppUpdate(false);
   </script>
 </body>
 </html>

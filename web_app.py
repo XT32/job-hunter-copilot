@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import threading
@@ -12,72 +13,325 @@ from src.glints import GlintsHunter
 from src.jobstreet import JobstreetHunter
 from src.maganghub import MagangHubHunter
 from src.dealls import DeallsHunter
-from src.storage import load_history, record_job, update_job_status, export_history_to_csv, get_analytics_summary, HISTORY_FILE
-from src.config import load_config, save_config, DEFAULT_CONFIG_PATH
+from src.storage import (
+    load_history,
+    record_job,
+    update_job_status,
+    export_history_to_csv,
+    get_analytics_summary,
+    verify_database_integrity,
+    acknowledge_legacy_hashes,
+)
+from src.local_db import get_default_db, TamperDetectedError
+from src.config import load_config, save_config, DEFAULT_CONFIG
 from src.cover_letter import generate_cover_letter
 from src.email_sender import send_cold_email
 from src.notifier import send_telegram_alert
 from src.cv_analyzer import extract_text_from_pdf, calculate_ats_match
 from src.scheduler import AutoHuntScheduler
 from src.scam_detector import check_for_red_flags
-from src.salary_guide import suggest_salary_range, get_umr_by_location, evaluate_candidate_salary
+from src.salary_guide import suggest_salary_range
+from src.updater import check_for_updates, apply_update, get_local_version_info
 
 app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # Maksimal 10 MB untuk upload CV
 playwright_lock = threading.Lock()
 
+
 @app.errorhandler(413)
 def request_entity_too_large(error):
     return jsonify({"success": False, "error": "Ukuran file terlalu besar! Maksimal 10 MB."}), 413
 
+
+@app.errorhandler(TamperDetectedError)
+def handle_tamper_error(error):
+    add_log(f"PERINGATAN KEAMANAN: {error.reason}", "danger")
+    return jsonify({
+        "success": False,
+        "tamper_alert": True,
+        "error": error.reason,
+        "security_status": error.details or verify_database_integrity(),
+    }), 423
+
+
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "attachments")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-DEFAULT_CV_PATH = os.path.join(UPLOAD_FOLDER, "CV.pdf")
 
 # In-Memory Ring Buffer untuk Live Activity Log (100 log terakhir)
 MAX_LOGS = 100
 system_logs = []
 logs_lock = threading.Lock()
 
+
 def add_log(message: str, level: str = "info"):
     with logs_lock:
         system_logs.append({
             "time": time.strftime("%H:%M:%S"),
             "message": message,
-            "level": level
+            "level": level,
         })
         if len(system_logs) > MAX_LOGS:
             system_logs.pop(0)
+
 
 HUNTER_MAP = {
     "glints": (GlintsHunter, "Glints Indonesia"),
     "jobstreet": (JobstreetHunter, "JobStreet Indonesia"),
     "maganghub": (MagangHubHunter, "MagangHub Kemnaker"),
-    "dealls": (DeallsHunter, "Dealls Jobs")
+    "dealls": (DeallsHunter, "Dealls Jobs"),
+}
+
+LOGIN_PORTAL_URLS = {
+    "jobstreet": "https://id.jobstreet.com/id",
+    "glints": "https://glints.com/id",
+    "maganghub": "https://maganghub.kemnaker.go.id",
+    "dealls": "https://dealls.com",
 }
 
 scheduler = AutoHuntScheduler(HUNTER_MAP, load_config)
+
+
+class InteractiveBrowserSession:
+    """
+    Menjaga browser Playwright tetap terbuka di thread miliknya sendiri ketika user
+    perlu login manual atau menyelesaikan tahap wizard lamaran di layar browser.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._active = False
+        self._close_event = None
+        self._done_event = None
+        self._meta = {}
+        self._thread = None
+
+    def is_active(self) -> bool:
+        with self._lock:
+            return self._active
+
+    def get_status(self) -> dict:
+        with self._lock:
+            return {
+                "active": self._active,
+                "meta": dict(self._meta) if self._active else {},
+            }
+
+    def close(self) -> bool:
+        with self._lock:
+            if not self._active:
+                return False
+            close_ev = self._close_event
+            done_ev = self._done_event
+        if close_ev:
+            close_ev.set()
+        if done_ev:
+            done_ev.wait(timeout=8)
+        return True
+
+    def run_apply_with_handoff(self, platform: str, job_url: str, title: str, company: str, cfg: dict) -> dict:
+        if self.is_active():
+            self.close()
+
+        result_holder = {}
+        ready_event = threading.Event()
+        close_event = threading.Event()
+        done_event = threading.Event()
+
+        HunterClass, platform_name = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
+
+        def worker():
+            try:
+                with playwright_lock:
+                    with sync_playwright() as p:
+                        context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
+                        page = context.new_page()
+                        try:
+                            hunter = HunterClass(page, cfg)
+                            res = hunter.inspect_and_apply(job_url, job_title=title, company=company)
+
+                            result_holder["result"] = res
+                            keep_open = res.get("status") in ("manual_action_needed", "login_required")
+
+                            if keep_open:
+                                with self._lock:
+                                    self._active = True
+                                    self._close_event = close_event
+                                    self._done_event = done_event
+                                    self._meta = {
+                                        "mode": "apply_handoff",
+                                        "platform": platform,
+                                        "platform_name": platform_name,
+                                        "url": job_url,
+                                        "title": title,
+                                        "company": company,
+                                        "status": res.get("status"),
+                                    }
+                                ready_event.set()
+                                # Tahan browser tetap terbuka sampai user selesai atau menutupnya dari UI
+                                while not close_event.is_set():
+                                    try:
+                                        if len(context.pages) == 0:
+                                            break
+                                    except Exception:
+                                        break
+                                    close_event.wait(timeout=0.5)
+                            else:
+                                ready_event.set()
+                        except Exception as e:
+                            result_holder["error"] = str(e)
+                            ready_event.set()
+                        finally:
+                            try:
+                                context.close()
+                            except Exception:
+                                pass
+            except Exception as e:
+                result_holder["error"] = str(e)
+                ready_event.set()
+            finally:
+                with self._lock:
+                    self._active = False
+                    self._close_event = None
+                    self._done_event = None
+                    self._meta = {}
+                done_event.set()
+
+        t = threading.Thread(target=worker, daemon=True)
+        self._thread = t
+        t.start()
+        ready_event.wait(timeout=90)
+
+        if "error" in result_holder:
+            raise RuntimeError(result_holder["error"])
+        return result_holder.get("result", {"status": "error", "message": "Timeout saat membuka proses lamaran."})
+
+    def open_interactive_url(self, url: str, label: str, cfg: dict, mode: str = "login") -> dict:
+        if self.is_active():
+            self.close()
+
+        ready_event = threading.Event()
+        close_event = threading.Event()
+        done_event = threading.Event()
+        error_holder = {}
+
+        def worker():
+            try:
+                with playwright_lock:
+                    with sync_playwright() as p:
+                        context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
+                        page = context.new_page()
+                        try:
+                            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                        except Exception as e:
+                            error_holder["error"] = str(e)
+                        with self._lock:
+                            self._active = True
+                            self._close_event = close_event
+                            self._done_event = done_event
+                            self._meta = {
+                                "mode": mode,
+                                "label": label,
+                                "url": url,
+                            }
+                        ready_event.set()
+                        while not close_event.is_set():
+                            try:
+                                if len(context.pages) == 0:
+                                    break
+                            except Exception:
+                                break
+                            close_event.wait(timeout=0.5)
+                        try:
+                            context.close()
+                        except Exception:
+                            pass
+            except Exception as e:
+                error_holder["error"] = str(e)
+                ready_event.set()
+            finally:
+                with self._lock:
+                    self._active = False
+                    self._close_event = None
+                    self._done_event = None
+                    self._meta = {}
+                done_event.set()
+
+        t = threading.Thread(target=worker, daemon=True)
+        self._thread = t
+        t.start()
+        ready_event.wait(timeout=35)
+        if "error" in error_holder:
+            return {"success": False, "error": error_holder["error"]}
+        return {"success": True, "browser": self.get_status()}
+
+
+browser_session = InteractiveBrowserSession()
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
+# ================= DATABASE SECURITY & TAMPER ENDPOINTS =================
+@app.route("/api/security/status", methods=["GET"])
+def security_status():
+    status = verify_database_integrity()
+    if status.get("tampered"):
+        add_log(f"PERINGATAN KEAMANAN: {status.get('reason')}", "danger")
+    elif status.get("legacy_file_warning"):
+        add_log(f"PERINGATAN: {status.get('legacy_file_warning')}", "warning")
+    return jsonify({"success": True, "security": status})
+
+
+@app.route("/api/security/restore", methods=["POST"])
+def security_restore():
+    res = get_default_db().restore_from_snapshot()
+    if res.get("success"):
+        acknowledge_legacy_hashes()
+        add_log("Database lokal berhasil dipulihkan dari snapshot sah terakhir via UI.", "success")
+    else:
+        add_log(f"Gagal memulihkan snapshot: {res.get('message')}", "danger")
+    return jsonify({**res, "security": verify_database_integrity()})
+
+
+@app.route("/api/security/reset", methods=["POST"])
+def security_reset():
+    res = get_default_db().reset_database_via_ui(DEFAULT_CONFIG)
+    acknowledge_legacy_hashes()
+    add_log("Database lokal di-reset dan disegel ulang melalui UI.", "warning")
+    return jsonify({**res, "security": verify_database_integrity()})
+
+
+@app.route("/api/security/ack-legacy", methods=["POST"])
+def security_ack_legacy():
+    acknowledge_legacy_hashes()
+    add_log("Peringatan modifikasi file eksternal ditandai selesai oleh pengguna via UI.", "info")
+    return jsonify({"success": True, "security": verify_database_integrity()})
+
+
+# ================= CONFIG ENDPOINTS (UI-ONLY DB) =================
 @app.route("/api/config", methods=["GET"])
 def get_config():
     return jsonify(load_config())
+
 
 @app.route("/api/config", methods=["POST"])
 def update_config():
     data = request.json or {}
     cfg = load_config()
-    
+
     for key in ["profile", "screening_defaults", "smtp", "telegram", "active_cv", "min_delay_sec", "max_delay_sec", "auto_skip_already_seen"]:
         if key in data:
-            cfg[key] = data[key]
-        
-    save_config(cfg)
-    add_log("Pengaturan profil & kriteria loker diperbarui.", "info")
+            if isinstance(data[key], dict) and isinstance(cfg.get(key), dict):
+                cfg[key].update(data[key])
+            else:
+                cfg[key] = data[key]
+
+    save_config(cfg, source="ui")
+    add_log("Pengaturan profil & kriteria loker diperbarui di database lokal via UI.", "info")
     return jsonify({"success": True, "config": cfg})
+
 
 # ================= MULTI-CV ENDPOINTS =================
 @app.route("/api/cvs", methods=["GET"])
@@ -85,7 +339,7 @@ def list_cvs():
     cfg = load_config()
     active_cv = cfg.get("active_cv", "CV.pdf")
     cv_files = []
-    
+
     if os.path.exists(UPLOAD_FOLDER):
         for f in os.listdir(UPLOAD_FOLDER):
             if f.lower().endswith(".pdf") and not f.startswith("."):
@@ -93,16 +347,16 @@ def list_cvs():
                 cv_files.append({
                     "filename": f,
                     "size": os.path.getsize(p),
-                    "active": (f == active_cv)
+                    "active": (f == active_cv),
                 })
-    
-    # Urutkan abjad
+
     cv_files.sort(key=lambda x: x["filename"])
     return jsonify({"cvs": cv_files, "active_cv": active_cv})
 
+
 @app.route("/api/upload-cv", methods=["POST"])
 def upload_cv():
-    """Menerima unggahan file PDF CV pengguna dan menetapkannya sebagai CV aktif"""
+    """Menerima unggahan file PDF CV pengguna dan menetapkannya sebagai CV aktif."""
     if "cv" not in request.files:
         return jsonify({"success": False, "error": "Tidak ada file yang diunggah"}), 400
 
@@ -118,13 +372,12 @@ def upload_cv():
     file.save(target_path)
     text = extract_text_from_pdf(target_path)
 
-    # Tetapkan sebagai active_cv
     cfg = load_config()
     cfg["active_cv"] = raw_filename
     if "smtp" not in cfg:
         cfg["smtp"] = {}
     cfg["smtp"]["cv_path"] = target_path
-    save_config(cfg)
+    save_config(cfg, source="ui")
 
     add_log(f"CV '{raw_filename}' berhasil diunggah ({len(text)} karakter terbaca).", "success")
 
@@ -133,8 +386,9 @@ def upload_cv():
         "filename": raw_filename,
         "message": f"File CV '{raw_filename}' berhasil disimpan sebagai CV aktif!",
         "has_text": len(text) > 20,
-        "char_count": len(text)
+        "char_count": len(text),
     })
+
 
 @app.route("/api/set-active-cv", methods=["POST"])
 def set_active_cv():
@@ -151,10 +405,11 @@ def set_active_cv():
     if "smtp" not in cfg:
         cfg["smtp"] = {}
     cfg["smtp"]["cv_path"] = file_path
-    save_config(cfg)
+    save_config(cfg, source="ui")
 
     add_log(f"CV aktif dialihkan ke '{safe_name}'.", "info")
     return jsonify({"success": True, "active_cv": safe_name})
+
 
 @app.route("/api/delete-cv", methods=["POST"])
 def delete_cv():
@@ -172,11 +427,58 @@ def delete_cv():
         if cfg.get("active_cv") == safe_name:
             remaining = [f for f in os.listdir(UPLOAD_FOLDER) if f.lower().endswith(".pdf")]
             cfg["active_cv"] = remaining[0] if remaining else ""
-            save_config(cfg)
+            save_config(cfg, source="ui")
         add_log(f"File CV '{safe_name}' dihapus.", "info")
         return jsonify({"success": True})
+    except TamperDetectedError:
+        raise
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ================= INTERACTIVE BROWSER CONTROL =================
+@app.route("/api/browser/status", methods=["GET"])
+def browser_status():
+    return jsonify({"success": True, "browser": browser_session.get_status()})
+
+
+@app.route("/api/browser/login", methods=["POST"])
+def open_portal_login():
+    data = request.json or {}
+    platform = data.get("platform", "jobstreet").lower()
+    url = data.get("url") or LOGIN_PORTAL_URLS.get(platform, "https://id.jobstreet.com/id")
+    label = data.get("label") or f"Login {platform.upper()}"
+    cfg = load_config()
+
+    add_log(f"Membuka jendela browser Copilot untuk {label} ({url})...", "info")
+    res = browser_session.open_interactive_url(url, label=label, cfg=cfg, mode="login")
+    return jsonify(res)
+
+
+@app.route("/api/browser/close", methods=["POST"])
+def close_interactive_browser():
+    closed = browser_session.close()
+    if closed:
+        add_log("Jendela browser interaktif ditutup melalui dashboard.", "info")
+    return jsonify({"success": True, "closed": closed})
+
+
+@app.route("/api/browser/complete-apply", methods=["POST"])
+def complete_manual_apply():
+    data = request.json or {}
+    job_url = data.get("url")
+    title = data.get("title", "Posisi")
+    company = data.get("company", "Perusahaan")
+    platform = data.get("platform", "jobstreet").lower()
+    _, platform_name = HUNTER_MAP.get(platform, (JobstreetHunter, "JobStreet Indonesia"))
+
+    if job_url:
+        record_job(job_url, title, company, status="applied", notes=f"Selesai via Browser Copilot ({platform_name})", source="ui")
+        add_log(f"Lamaran '{title}' di {company} dikonfirmasi terkirim & dicatat ke Kanban.", "success")
+
+    browser_session.close()
+    return jsonify({"success": True})
+
 
 # ================= LIVE LOGS & SCANNING =================
 @app.route("/api/logs", methods=["GET"])
@@ -184,46 +486,56 @@ def get_logs():
     with logs_lock:
         return jsonify(list(system_logs))
 
+
 @app.route("/api/scan", methods=["POST"])
 def scan_jobs():
     data = request.json or {}
     platform = data.get("platform", "glints").lower()
+    override_keywords = data.get("keywords")
     cfg = load_config()
+
+    if browser_session.is_active():
+        add_log("Menutup sesi browser interaktif sebelumnya sebelum memindai...", "info")
+        browser_session.close()
 
     hunter_info = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
     HunterClass, platform_name = hunter_info
 
-    # Tentukan file CV yang sedang aktif untuk ATS scoring
     active_cv = cfg.get("active_cv", "CV.pdf")
-    active_cv_path = os.path.join(UPLOAD_FOLDER, active_cv)
-    cv_text = extract_text_from_pdf(active_cv_path) if os.path.exists(active_cv_path) else ""
+    active_cv_path = os.path.join(UPLOAD_FOLDER, active_cv) if active_cv else ""
+    cv_text = extract_text_from_pdf(active_cv_path) if active_cv_path and os.path.exists(active_cv_path) else ""
+
+    # Jika user mengetik kata kunci langsung di bar Scan, gunakan itu sementara untuk filter juga
+    scan_cfg = json.loads(json.dumps(cfg))
+    if override_keywords:
+        kw_list = [k.strip() for k in str(override_keywords).split(",") if k.strip()]
+        if kw_list:
+            scan_cfg["profile"]["target_keywords"] = kw_list
 
     add_log(f"Menyiapkan browser untuk pemindaian di {platform_name}...", "info")
 
     with playwright_lock:
         with sync_playwright() as p:
-            context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
+            context = get_browser_context(p, headless=False, slow_mo=scan_cfg.get("slow_mo_ms", 150))
             page = context.new_page()
-            
+
             try:
                 add_log(f"Membuka portal {platform_name} dan mencari lowongan sesuai profil...", "info")
-                hunter = HunterClass(page, cfg)
-                jobs = hunter.search_jobs()
+                hunter = HunterClass(page, scan_cfg)
+                jobs = hunter.search_jobs(keywords=scan_cfg["profile"].get("target_keywords"))
 
                 add_log(f"Ditemukan {len(jobs)} lowongan cocok di {platform_name}. Menjalankan evaluasi ATS & deteksi penipuan...", "info")
 
-                # Tambahkan skor ATS dan Deteksi Zonk / Red Flag ke setiap pekerjaan
                 for j in jobs:
                     j["ats"] = calculate_ats_match(cv_text, j["title"], j.get("company", ""))
                     j["red_flag"] = check_for_red_flags(
                         title=j["title"],
                         company=j["company"],
                         description=j.get("description", ""),
-                        location=j.get("location", "")
+                        location=j.get("location", ""),
                     )
 
-                # Notifikasi Telegram jika aktif
-                tg_cfg = cfg.get("telegram", {})
+                tg_cfg = scan_cfg.get("telegram", {})
                 if tg_cfg.get("enabled", False) and jobs:
                     for j in jobs[:3]:
                         send_telegram_alert(
@@ -233,16 +545,22 @@ def scan_jobs():
                             platform=platform_name,
                             salary=j.get("salary", "Tidak dicantumkan"),
                             bot_token=tg_cfg.get("bot_token", ""),
-                            chat_id=tg_cfg.get("chat_id", "")
+                            chat_id=tg_cfg.get("chat_id", ""),
                         )
 
                 add_log(f"Pemindaian {platform_name} selesai. Menampilkan {len(jobs)} hasil.", "success")
                 return jsonify({"success": True, "platform": platform, "jobs": jobs, "has_cv": bool(cv_text), "active_cv": active_cv})
+            except TamperDetectedError:
+                raise
             except Exception as e:
                 add_log(f"Gagal saat memindai {platform_name}: {str(e)}", "danger")
                 return jsonify({"success": False, "error": str(e)}), 500
             finally:
-                context.close()
+                try:
+                    context.close()
+                except Exception:
+                    pass
+
 
 @app.route("/api/apply", methods=["POST"])
 def apply_job():
@@ -256,36 +574,36 @@ def apply_job():
         return jsonify({"success": False, "error": "URL lowongan wajib disertakan"}), 400
 
     cfg = load_config()
-    hunter_info = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
-    HunterClass, platform_name = hunter_info
+    _, platform_name = HUNTER_MAP.get(platform, (GlintsHunter, "Glints Indonesia"))
 
     add_log(f"Membuka proses melamar untuk '{title}' di {company} ({platform_name})...", "info")
 
-    with playwright_lock:
-        with sync_playwright() as p:
-            context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
-            page = context.new_page()
+    try:
+        result = browser_session.run_apply_with_handoff(platform, job_url, title, company, cfg)
 
-            try:
-                hunter = HunterClass(page, cfg)
-                result = hunter.inspect_and_apply(job_url)
+        if result["status"] == "success":
+            record_job(job_url, title, company, status="applied", notes=f"Lamar via {platform_name}", source="ui")
+            add_log(f"Lamaran '{title}' di {company} berhasil terkirim!", "success")
+        elif result["status"] == "already_applied":
+            record_job(job_url, title, company, status="applied", notes=f"Sudah dilamar sebelumnya ({platform_name})", source="ui")
+            add_log(f"Lowongan '{title}' di {company} ternyata sudah pernah dilamar.", "warning")
+        elif result["status"] == "external_link":
+            record_job(job_url, title, company, status="skipped", notes=f"Tautan eksternal ({platform_name})", source="ui")
+            add_log(f"Lowongan '{title}' di {company} dialihkan ke web karir eksternal.", "info")
+        elif result["status"] in ("manual_action_needed", "login_required"):
+            add_log(f"Browser dibiarkan terbuka untuk '{title}': {result['message']}", "warning")
 
-                if result["status"] == "success":
-                    record_job(job_url, title, company, status="applied", notes=f"Lamar via {platform_name}")
-                    add_log(f"Lamaran '{title}' di {company} berhasil terkirim!", "success")
-                elif result["status"] == "already_applied":
-                    record_job(job_url, title, company, status="applied", notes=f"Sudah dilamar sebelumnya ({platform_name})")
-                    add_log(f"Lowongan '{title}' di {company} ternyata sudah pernah dilamar.", "warning")
-                elif result["status"] == "external_link":
-                    record_job(job_url, title, company, status="skipped", notes=f"Tautan eksternal ({platform_name})")
-                    add_log(f"Lowongan '{title}' di {company} dialihkan ke web karir eksternal.", "info")
+        return jsonify({
+            "success": True,
+            "result": result,
+            "browser": browser_session.get_status(),
+        })
+    except TamperDetectedError:
+        raise
+    except Exception as e:
+        add_log(f"Kendala melamar '{title}': {str(e)}", "danger")
+        return jsonify({"success": False, "error": str(e)}), 500
 
-                return jsonify({"success": True, "result": result})
-            except Exception as e:
-                add_log(f"Kendala melamar '{title}': {str(e)}", "danger")
-                return jsonify({"success": False, "error": str(e)}), 500
-            finally:
-                context.close()
 
 @app.route("/api/skip", methods=["POST"])
 def skip_job():
@@ -298,9 +616,27 @@ def skip_job():
     if not job_url:
         return jsonify({"success": False, "error": "URL wajib diisi"}), 400
 
-    record_job(job_url, title, company, status="skipped", notes=notes)
+    record_job(job_url, title, company, status="skipped", notes=notes, source="ui")
     add_log(f"Lowongan '{title}' di {company} dilewati.", "info")
     return jsonify({"success": True})
+
+
+@app.route("/api/record-manual", methods=["POST"])
+def record_manual():
+    data = request.json or {}
+    job_url = data.get("url")
+    title = data.get("title", "Lamaran Manual")
+    company = data.get("company", "Perusahaan")
+    status = data.get("status", "applied")
+    notes = data.get("notes", "Dicatat lewat Web UI")
+
+    if not job_url:
+        return jsonify({"success": False, "error": "URL wajib diisi"}), 400
+
+    record_job(job_url, title, company, status=status, notes=notes, source="ui")
+    add_log(f"Lamaran '{title}' di {company} dicatat ke Kanban ({status}).", "success")
+    return jsonify({"success": True})
+
 
 @app.route("/api/status-update", methods=["POST"])
 def update_status():
@@ -312,10 +648,11 @@ def update_status():
     if not job_url or not new_status:
         return jsonify({"success": False, "error": "URL dan status baru diperlukan"}), 400
 
-    success = update_job_status(job_url, new_status, notes)
+    success = update_job_status(job_url, new_status, notes, source="ui")
     if success:
         add_log(f"Status lamaran diperbarui ke '{new_status}'.", "info")
     return jsonify({"success": success})
+
 
 @app.route("/api/cover-letter", methods=["POST"])
 def get_cover_letter():
@@ -323,11 +660,12 @@ def get_cover_letter():
     role = data.get("role", "Posisi")
     company = data.get("company", "Perusahaan")
     preset = data.get("preset", "formal")
-    
+
     cfg = load_config()
     profile = cfg.get("profile", {})
     letter = generate_cover_letter(role, company, profile, preset)
     return jsonify({"success": True, "cover_letter": letter})
+
 
 @app.route("/api/send-email", methods=["POST"])
 def direct_send_email():
@@ -335,7 +673,7 @@ def direct_send_email():
     to_email = data.get("to_email")
     subject = data.get("subject")
     body = data.get("body")
-    
+
     cfg = load_config()
     smtp_cfg = cfg.get("smtp", {})
     active_cv = cfg.get("active_cv", "CV.pdf")
@@ -343,11 +681,12 @@ def direct_send_email():
 
     result = send_cold_email(to_email, subject, body, attachment_path=cv_path, smtp_config=smtp_cfg)
     if result["success"]:
-        record_job(f"mailto:{to_email}", subject, to_email, status="applied", notes="Cold Email Langsung via SMTP")
+        record_job(f"mailto:{to_email}", subject, to_email, status="applied", notes="Cold Email Langsung via SMTP", source="ui")
         add_log(f"Cold email berhasil terkirim ke {to_email} via SMTP.", "success")
     else:
         add_log(f"Gagal mengirim email via SMTP ke {to_email}: {result.get('message')}", "danger")
     return jsonify(result)
+
 
 # ================= SALARY GUIDE & ANALYTICS =================
 @app.route("/api/salary-guide", methods=["GET"])
@@ -357,10 +696,12 @@ def salary_guide():
     guide = suggest_salary_range(location, exp)
     return jsonify(guide)
 
+
 @app.route("/api/analytics", methods=["GET"])
 def get_analytics():
     stats = get_analytics_summary()
     return jsonify(stats)
+
 
 @app.route("/api/scheduler", methods=["GET", "POST"])
 def handle_scheduler():
@@ -375,9 +716,11 @@ def handle_scheduler():
             add_log("Background scheduler dihentikan.", "info")
     return jsonify(scheduler.get_status())
 
+
 @app.route("/api/history", methods=["GET"])
 def get_history():
     return jsonify(load_history())
+
 
 @app.route("/api/export", methods=["GET"])
 def export_csv():
@@ -387,16 +730,16 @@ def export_csv():
         csv_file,
         mimetype="text/csv",
         as_attachment=True,
-        download_name="riwayat_lamaran_kerja.csv"
+        download_name="riwayat_lamaran_kerja.csv",
     )
+
 
 @app.route("/api/backup", methods=["GET"])
 def download_backup():
-    import json
     backup_data = {
         "config": load_config(),
         "history": load_history(),
-        "exported_at": time.strftime("%Y-%m-%d %H:%M:%S")
+        "exported_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     backup_path = os.path.join(os.path.dirname(__file__), "data", "backup_loker_cli.json")
     with open(backup_path, "w", encoding="utf-8") as f:
@@ -404,17 +747,65 @@ def download_backup():
     add_log("Cadangan data JSON diunduh pengguna.", "info")
     return send_file(backup_path, mimetype="application/json", as_attachment=True, download_name="backup_loker_cli.json")
 
+
+# ================= 1-CLICK APP UPDATE (GITHUB) =================
+@app.route("/api/update/check", methods=["GET"])
+def api_update_check():
+    res = check_for_updates()
+    return jsonify(res)
+
+
+@app.route("/api/update/apply", methods=["POST"])
+def api_update_apply():
+    if browser_session.is_active():
+        browser_session.close()
+    add_log("Memeriksa dan mengunduh pembaruan aplikasi dari GitHub...", "info")
+    res = apply_update()
+    if res.get("success"):
+        add_log(res.get("message", "Aplikasi berhasil diperbarui."), "success")
+    else:
+        add_log(f"Gagal update aplikasi: {res.get('error')}", "danger")
+    return jsonify(res)
+
+
+@app.route("/api/update/restart", methods=["POST"])
+def api_update_restart():
+    if browser_session.is_active():
+        browser_session.close()
+    add_log("Memuat ulang server aplikasi agar pembaruan aktif...", "info")
+
+    def _restart_later():
+        time.sleep(0.6)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    threading.Thread(target=_restart_later, daemon=True).start()
+    return jsonify({"success": True, "message": "Aplikasi sedang dimuat ulang..."})
+
+
 def start_server(port=5000, auto_open=True):
+    # Pastikan database lokal terinisialisasi & cek integritas saat boot
+    try:
+        sec = verify_database_integrity()
+        if sec.get("tampered"):
+            add_log(f"PERINGATAN KEAMANAN SAAT STARTUP: {sec.get('reason')}", "danger")
+        elif sec.get("legacy_file_warning"):
+            add_log(f"PERINGATAN: {sec.get('legacy_file_warning')}", "warning")
+        else:
+            add_log("Database lokal terproteksi siap (UI-Only Mode).", "success")
+    except Exception as e:
+        add_log(f"Info inisialisasi database: {e}", "warning")
+
     if auto_open:
         def open_browser():
             time.sleep(1.2)
             webbrowser.open(f"http://127.0.0.1:{port}")
         threading.Thread(target=open_browser, daemon=True).start()
 
-    add_log(f"Server dashboard aktif di port {port}.", "success")
-    print(f"\n[OK] loker-cli Web Dashboard aktif di: http://127.0.0.1:{port}")
-    print("[*] Menutup terminal ini akan menghentikan server web.\n")
+    add_log(f"Server dashboard UI-First aktif di http://127.0.0.1:{port}.", "success")
+    print(f"\n[OK] loker-copilot Web Dashboard (UI-First) aktif di: http://127.0.0.1:{port}")
+    print("[*] Mode Terminal CLI telah dinonaktifkan. Seluruh pengaturan & database dikelola via Web UI.\n")
     app.run(host="127.0.0.1", port=port, debug=False)
+
 
 if __name__ == "__main__":
     start_server()

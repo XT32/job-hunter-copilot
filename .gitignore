@@ -20,6 +20,12 @@ attachments/*
 
 # Local User Data, History & Backups
 data/history.json
+data/*.db
+data/*.db-*
+data/.*.key
+data/.*.seal
+data/.*.snapshot
+data/.legacy_hashes.json
 data/*.csv
 data/backup_*.json
 *.log
