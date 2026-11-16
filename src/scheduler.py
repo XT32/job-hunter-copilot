@@ -53,7 +53,10 @@ class AutoHuntScheduler:
                 self.log_callback(msg, level)
             except Exception:
                 pass
-        print(f"[⏰ Scheduler] {msg}")
+        try:
+            print(f"[Scheduler] {msg}")
+        except Exception:
+            pass
 
     def _load_initial_seen(self):
         try:
