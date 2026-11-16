@@ -23,9 +23,8 @@ import time
 USER_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "user_browser_data")
 
 # Flag hemat RAM dan stealth untuk laptop spek standar / rendah
-BROWSER_ARGS = [
+COMMON_BROWSER_ARGS = [
     "--disable-dev-shm-usage",
-    "--disable-gpu",
     "--renderer-process-limit=2",
     "--no-first-run",
     "--no-default-browser-check",
@@ -39,8 +38,76 @@ BROWSER_ARGS = [
     "--disable-features=TranslateUI,OptimizationHints,MediaRouter",
     "--disable-sync",
     "--disable-blink-features=AutomationControlled",
+    "--mute-audio",
+    "--disable-speech-api",
+    "--disk-cache-size=33554432",
+    "--media-cache-size=16777216",
+    "--js-flags=--max-old-space-size=512",
     "--window-size=1280,860",
 ]
+
+# Backward compatibility alias
+BROWSER_ARGS = list(COMMON_BROWSER_ARGS)
+
+BLOCKED_MEDIA_TYPES = {"image", "media", "font"}
+BLOCKED_TRACKER_DOMAINS = [
+    "google-analytics.com",
+    "googletagmanager.com",
+    "googleads.",
+    "doubleclick.net",
+    "facebook.net",
+    "connect.facebook.net",
+    "hotjar.com",
+    "sentry.io",
+    "datadoghq-browser-agent.com",
+    "browser-intake-datadoghq.com",
+    "segment.io",
+    "segment.com",
+    "amplitude.com",
+    "mixpanel.com",
+    "clarity.ms",
+    "criteo.net",
+    "adnxs.com",
+    "pubmatic.com",
+    "scorecardresearch.com",
+    "advertising.",
+    "telemetry.",
+]
+
+
+def optimize_page_resources(page, block_media=True):
+    """
+    Mengoptimalkan konsumsi RAM, CPU, dan bandwidth pada halaman Playwright.
+    - Memblokir tracker, telemetri, dan script analitik berat yang memakan resource laptop.
+    - Jika block_media=True (default untuk scraping), memblokir pemuatan gambar,
+      video, dan webfont pihak ketiga agar scraping berjalan instan dan hemat memori.
+    - Jika block_media=False (mode visual/login), gambar dan styling tetap aktif.
+    """
+    def _route_filter(route):
+        try:
+            req = route.request
+            res_type = req.resource_type
+            url = req.url.lower()
+
+            # 1. Selalu blokir tracker / ads / telemetri pihak ketiga
+            if any(dom in url for dom in BLOCKED_TRACKER_DOMAINS):
+                return route.abort()
+
+            # 2. Blokir media berat saat background scraping
+            if block_media and res_type in BLOCKED_MEDIA_TYPES:
+                return route.abort()
+
+            return route.continue_()
+        except Exception:
+            try:
+                route.continue_()
+            except Exception:
+                pass
+
+    try:
+        page.route("**/*", _route_filter)
+    except Exception:
+        pass
 
 _cached_channel = False  # False = belum dicek, None = pakai chromium bawaan
 
@@ -100,11 +167,18 @@ def get_browser_context(playwright_instance, headless=False, slow_mo=150, user_d
     _cleanup_stale_singleton_locks(user_data_dir)
 
     channel = _detect_channel(playwright_instance)
+
+    # Di mode visual (headless=False), HINDARI --disable-gpu agar GPU laptop merender window secara mulus
+    # tanpa membebani 100% CPU untuk software-rasterization (SwiftShader/llvmpipe).
+    active_args = list(COMMON_BROWSER_ARGS)
+    if headless:
+        active_args.append("--disable-gpu")
+
     kwargs = {
         "user_data_dir": user_data_dir,
         "headless": headless,
         "slow_mo": slow_mo,
-        "args": BROWSER_ARGS,
+        "args": active_args,
         "viewport": {"width": 1280, "height": 820},
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     }

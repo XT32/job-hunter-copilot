@@ -63,8 +63,74 @@ class JobstreetHunter(BaseJobHunter):
 
             for _ in range(2):
                 self.page.mouse.wheel(0, 800)
-                time.sleep(0.8)
+                time.sleep(0.3)
 
+            # Optimasi: Ekstraksi cepat langsung di dalam Chromium V8 via evaluate
+            raw_cards = []
+            try:
+                raw_cards = self.page.evaluate("""() => {
+                    const articles = document.querySelectorAll("article");
+                    const results = [];
+                    for (const art of articles) {
+                        const titleEl = art.querySelector("a[data-automation='jobTitle'], a[href*='/job/']");
+                        if (!titleEl) continue;
+                        const href = titleEl.getAttribute("href") || "";
+                        const title = titleEl.innerText ? titleEl.innerText.trim() : "";
+                        const compEl = art.querySelector("[data-automation='jobCompany']");
+                        const salEl = art.querySelector("[data-automation='jobSalary']");
+                        const locEl = art.querySelector("[data-automation='jobLocation']");
+                        const descEl = art.querySelector("[data-automation='jobShortDescription'], [data-automation='jobSnippet'], span[class*='teaser']");
+                        results.push({
+                            href: href,
+                            title: title,
+                            company: compEl && compEl.innerText ? compEl.innerText.trim() : "Perusahaan tidak dicantumkan",
+                            salary: salEl && salEl.innerText ? salEl.innerText.trim() : "Tidak dicantumkan",
+                            location: locEl && locEl.innerText ? locEl.innerText.trim() : "",
+                            description: descEl && descEl.innerText ? descEl.innerText.trim() : ""
+                        });
+                    }
+                    return results;
+                }""")
+            except Exception:
+                raw_cards = None
+
+            if isinstance(raw_cards, list) and len(raw_cards) > 0:
+                for item in raw_cards:
+                    href = item.get("href", "")
+                    if not href or "/job/" not in href:
+                        continue
+                    clean_url = href.split("?")[0]
+                    if not clean_url.startswith("http"):
+                        clean_url = "https://id.jobstreet.com" + clean_url
+                    if clean_url in seen_urls:
+                        continue
+                    seen_urls.add(clean_url)
+
+                    if self.config.get("auto_skip_already_seen", True) and is_job_recorded(clean_url):
+                        continue
+
+                    title = item.get("title", "").strip() or "Lowongan Pekerjaan"
+                    company = item.get("company", "Perusahaan tidak dicantumkan").strip()
+                    salary = item.get("salary", "Tidak dicantumkan").strip()
+                    location = item.get("location", "").strip()
+                    description = item.get("description", "").strip()
+
+                    is_match, reason = self.matcher.evaluate(title, company, location=location, description=description)
+                    if not is_match:
+                        record_job(clean_url, title, company, status="skipped", notes=f"JobStreet Filter: {reason}")
+                        continue
+
+                    jobs.append({
+                        "title": title,
+                        "company": company,
+                        "salary": salary,
+                        "location": location,
+                        "description": description,
+                        "url": clean_url,
+                    })
+                continue
+
+            # Fallback ke Playwright Locator (kompatibel penuh dengan Mock Page unit test)
             title_elements = self.page.locator("a[data-automation='jobTitle']").all()
 
             for title_el in title_elements:

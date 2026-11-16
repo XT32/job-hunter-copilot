@@ -1,9 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
-title loker-copilot Web Dashboard (UI-First)
+title Job Hunter Copilot Web Dashboard
 
 echo =========================================================
-echo     LOKER-COPILOT WEB DASHBOARD (UI-FIRST / WINDOWS)     
+echo    JOB HUNTER COPILOT WEB DASHBOARD (WINDOWS)     
 echo =========================================================
 echo.
 
@@ -26,12 +26,15 @@ if not exist ".venv" (
 :: 3. Aktifkan Virtual Environment
 call .venv\Scripts\activate.bat
 
-:: 4. Pasang modul yang diperlukan
-echo [*] Memeriksa modul dan browser Playwright...
-pip install -r requirements.txt --quiet
-playwright install chromium
+:: 4. Pasang modul yang diperlukan (hanya pada instalasi awal)
+if not exist ".venv\installed.flag" (
+    echo [*] Memeriksa modul dan browser Playwright (setup awal)...
+    pip install -r requirements.txt --quiet
+    call playwright install chromium
+    echo installed > ".venv\installed.flag"
+)
 
-:: 5. Langsung jalankan Web UI (UI-First)
+:: 5. Langsung jalankan Web UI
 echo.
 echo [*] Membuka Web Dashboard di browser (http://127.0.0.1:5000)...
 python web_app.py

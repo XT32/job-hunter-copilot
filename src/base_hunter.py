@@ -18,7 +18,7 @@
 import os
 import time
 from abc import ABC, abstractmethod
-from src.browser import human_delay
+from src.browser import human_delay, optimize_page_resources
 
 ATTACHMENTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attachments")
 
@@ -27,6 +27,10 @@ class BaseJobHunter(ABC):
     def __init__(self, page, config):
         self.page = page
         self.config = config
+        try:
+            optimize_page_resources(self.page, block_media=True)
+        except Exception:
+            pass
 
     @abstractmethod
     def check_login_status(self) -> bool:
@@ -62,6 +66,10 @@ class BaseJobHunter(ABC):
             pages = self.page.context.pages
             if len(pages) > prev_count:
                 self.page = pages[-1]
+                try:
+                    optimize_page_resources(self.page, block_media=True)
+                except Exception:
+                    pass
                 if hasattr(self, "screener") and self.screener is not None:
                     self.screener.page = self.page
                 self.page.wait_for_load_state("domcontentloaded", timeout=15000)

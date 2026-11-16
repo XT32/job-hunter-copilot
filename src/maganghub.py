@@ -71,8 +71,68 @@ class MagangHubHunter(BaseJobHunter):
 
             for _ in range(2):
                 self.page.mouse.wheel(0, 800)
-                time.sleep(0.8)
+                time.sleep(0.3)
 
+            # Optimasi: Ekstraksi cepat langsung di dalam Chromium V8 via evaluate
+            raw_cards = []
+            try:
+                raw_cards = self.page.evaluate("""() => {
+                    const cards = document.querySelectorAll("a[href*='/lowongan/'], a[href*='/detail/'], .card, article");
+                    const results = [];
+                    for (const card of cards) {
+                        let href = card.getAttribute("href") || "";
+                        if (!href) {
+                            const a = card.querySelector("a");
+                            if (a) href = a.getAttribute("href") || "";
+                        }
+                        const text = card.innerText || "";
+                        results.push({ href: href, text: text });
+                    }
+                    return results;
+                }""")
+            except Exception:
+                raw_cards = None
+
+            if isinstance(raw_cards, list) and len(raw_cards) > 0:
+                for item in raw_cards:
+                    href = item.get("href", "")
+                    if not href or ("lowongan" not in href and "detail" not in href):
+                        continue
+                    clean_url = href.split("?")[0]
+                    if not clean_url.startswith("http"):
+                        clean_url = "https://maganghub.kemnaker.go.id" + clean_url
+                    if clean_url in seen_urls:
+                        continue
+                    seen_urls.add(clean_url)
+                    if self.config.get("auto_skip_already_seen", True) and is_job_recorded(clean_url):
+                        continue
+
+                    card_text = item.get("text", "").split("\n")
+                    clean_lines = [line.strip() for line in card_text if line.strip() and line.strip().lower() not in BADGE_TAGS]
+                    title = clean_lines[0] if len(clean_lines) > 0 else "Posisi Magang"
+                    company = clean_lines[1] if len(clean_lines) > 1 else "Mitra Kemnaker"
+
+                    location = "Indonesia"
+                    for line in card_text:
+                        if any(k in line.lower() for k in ["kota", "kabupaten", "dki", "provinsi", "jakarta", "bandung", "surabaya", "bekasi"]):
+                            location = line.strip()
+                            break
+
+                    is_match, reason = self.matcher.evaluate(title, company, location=location)
+                    if not is_match:
+                        record_job(clean_url, title, company, status="skipped", notes=f"MagangHub Filter: {reason}")
+                        continue
+
+                    jobs.append({
+                        "title": title,
+                        "company": company,
+                        "salary": "Uang Saku Kemnaker (Sesuai Ketentuan)",
+                        "location": location,
+                        "url": clean_url,
+                    })
+                continue
+
+            # Fallback ke Playwright Locator (kompatibel dengan Mock Page unit test)
             cards = self.page.locator("a[href*='/lowongan/'], a[href*='/detail/'], .card, article").all()
 
             for card in cards:
