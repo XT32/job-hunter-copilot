@@ -74,6 +74,7 @@ DEFAULT_CONFIG = {
     "auto_skip_already_seen": True,
     "browser_headless": True,
     "slow_mo_ms": 150,
+    "auto_shutdown_idle_minutes": 5,
 }
 
 

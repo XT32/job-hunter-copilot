@@ -270,6 +270,7 @@ Agar dapat menerima notifikasi loker dan pengingat wawancara di ponsel Anda:
 * **Proteksi CSRF & Origin Dinamis:** Seluruh aksi pengubah status diproteksi token CSRF ganda dan verifikasi Origin yang mendukung domain reverse proxy lokal (`.local`, `.test`, `.lan`, atau IP privat).
 * **Anti-Deteksi & Optimasi Performa Ringan:** Menggunakan Playwright dengan flag stealth Chromium khusus, pencegahan lag CPU lewat akselerasi hardware GPU pada mode visual, pembatasan heap V8 (512MB), serta pemfilteran request jaringan (blokir tracker iklan dan aset media saat background scanning) agar laptop spek standar tetap dingin dan responsif.
 * **Isolasi Multi-Akun:** Mendukung isolasi sesi login browser (`user_browser_data/profiles/`) dan kuota pelamaran independen per akun.
+* **Kontrol Daya & Auto-Shutdown Watchdog:** Tombol cepat `⏻ Matikan Copilot` di header, footer, dan menu pengaturan untuk menghentikan server lokal tanpa repot mencari Terminal/Task Manager. Dilengkapi *idle watchdog* yang otomatis mematikan aplikasi jika seluruh tab peramban ditutup atau ditinggalkan menganggur (bawaan 5 menit, dapat dikonfigurasi) untuk menghemat memori dan baterai laptop.
 
 ---
 
@@ -310,7 +311,7 @@ job-hunter-copilot/
 │   └── js/app.js            # Logika antarmuka Web UI, filter, & integrasi API
 ├── templates/
 │   └── index.html           # Tampilan visual dashboard Web (Tab 1 - Tab 5)
-├── tests/                   # 24 berkas unit test lengkap (113 pengujian)
+├── tests/                   # 25 berkas unit test lengkap (121 pengujian)
 ├── start_windows.bat        # Skrip peluncur cepat 1-klik untuk Windows
 ├── start_linux.sh           # Skrip peluncur cepat 1-klik untuk Linux/macOS
 ├── web_app.py               # Server aplikasi Web Dashboard Flask
@@ -321,7 +322,7 @@ job-hunter-copilot/
 
 ## 🧪 Rangkaian Pengujian Otomatis
 
-Repositori ini dilengkapi rangkaian **113 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, background scheduler, hingga kepatuhan legal notice & unduh source code AGPLv3):
+Repositori ini dilengkapi rangkaian **121 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, background scheduler, hingga kepatuhan legal notice & unduh source code AGPLv3):
 
 ```bash
 python3 -m unittest discover tests -v

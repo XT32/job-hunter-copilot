@@ -228,6 +228,10 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
         document.getElementById('cfgAutoSkip').checked = currentConfig.auto_skip_already_seen !== false;
         const headlessEl = document.getElementById('cfgBrowserHeadless');
         if (headlessEl) headlessEl.checked = !!currentConfig.browser_headless;
+        const autoShutdownEl = document.getElementById('cfgAutoShutdownMinutes');
+        if (autoShutdownEl) {
+          autoShutdownEl.value = (currentConfig.auto_shutdown_idle_minutes !== undefined) ? currentConfig.auto_shutdown_idle_minutes : 5;
+        }
 
         document.getElementById('cfgTgToken').value = tg.bot_token || '';
         document.getElementById('cfgTgChat').value = tg.chat_id || '';
@@ -319,6 +323,9 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
         enabled: document.getElementById('cfgTgEnabled').checked
       };
 
+      const autoShutdownEl = document.getElementById('cfgAutoShutdownMinutes');
+      const autoShutdownVal = autoShutdownEl ? parseInt(autoShutdownEl.value) : 5;
+
       try {
         const res = await fetch('/api/config', {
           method: 'POST',
@@ -328,7 +335,8 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
             screening_defaults: scr,
             telegram: tg,
             auto_skip_already_seen: document.getElementById('cfgAutoSkip').checked,
-            browser_headless: document.getElementById('cfgBrowserHeadless') ? document.getElementById('cfgBrowserHeadless').checked : false
+            browser_headless: document.getElementById('cfgBrowserHeadless') ? document.getElementById('cfgBrowserHeadless').checked : false,
+            auto_shutdown_idle_minutes: isNaN(autoShutdownVal) ? 5 : autoShutdownVal
           })
         });
         const data = await res.json();
@@ -2076,5 +2084,81 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         checkAppUpdate(false);
+      }
+    });
+
+    /* SYSTEM SHUTDOWN & LIFECYCLE MANAGEMENT */
+    function confirmShutdownApp() {
+      const modal = document.getElementById('shutdownModal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeShutdownModal() {
+      const modal = document.getElementById('shutdownModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function executeShutdownApp() {
+      const btn = document.getElementById('btnConfirmShutdown');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Mematikan...';
+      }
+
+      try {
+        await fetch('/api/system/shutdown', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': CSRF_TOKEN
+          },
+          body: JSON.stringify({ csrf_token: CSRF_TOKEN })
+        });
+      } catch (err) {
+        // Abaikan jika network drop karena proses server langsung exit
+      }
+
+      closeShutdownModal();
+      const overlay = document.getElementById('shutdownOverlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+      }
+    }
+
+    window.confirmShutdownApp = confirmShutdownApp;
+    window.closeShutdownModal = closeShutdownModal;
+    window.executeShutdownApp = executeShutdownApp;
+
+    /* CLIENT HEARTBEAT & UNLOAD AUTO-DISCONNECT */
+    const CLIENT_TAB_ID = 'tab_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+
+    function sendHeartbeat() {
+      fetch('/api/system/heartbeat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': CSRF_TOKEN
+        },
+        body: JSON.stringify({ tab_id: CLIENT_TAB_ID, csrf_token: CSRF_TOKEN })
+      }).catch(() => {});
+    }
+
+    // Ping heartbeat saat pertama dibuka dan berkala setiap 15 detik
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 15000);
+
+    // Laporkan ke server saat tab ini ditutup / di-unload
+    window.addEventListener('pagehide', () => {
+      const payload = JSON.stringify({ tab_id: CLIENT_TAB_ID, csrf_token: CSRF_TOKEN });
+      if (navigator.sendBeacon) {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon('/api/system/client-disconnect', blob);
+      } else {
+        fetch('/api/system/client-disconnect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+          body: payload,
+          keepalive: true
+        }).catch(() => {});
       }
     });
