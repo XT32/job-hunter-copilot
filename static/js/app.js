@@ -1707,9 +1707,297 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       } catch (e) {}
     }
 
+    /* ================= MULTI-ACCOUNT MANAGEMENT ================= */
+    let cachedAccounts = [];
+    let activeAccountId = 'default';
+
+    function toggleAccountDropdown() {
+      const menu = document.getElementById('accountDropdownMenu');
+      if (!menu) return;
+      menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+    }
+
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('accountDropdownMenu');
+      const btn = document.getElementById('btnAccountSwitcher');
+      if (menu && menu.style.display === 'block') {
+        if (!menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
+          menu.style.display = 'none';
+        }
+      }
+    });
+
+    async function loadAccounts() {
+      try {
+        const res = await fetch('/api/accounts');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.accounts)) {
+          cachedAccounts = data.accounts;
+          activeAccountId = data.active_account_id || 'default';
+          renderAccountsUI();
+        }
+      } catch (e) {
+        console.error('Gagal memuat daftar akun:', e);
+      }
+    }
+
+    function renderAccountsUI() {
+      const activeAcc = cachedAccounts.find(a => a.id === activeAccountId) || cachedAccounts[0] || { name: 'Akun Utama' };
+
+      // 1. Update Header Button Label & Count Badge
+      const labelEl = document.getElementById('currentAccountLabel');
+      if (labelEl) labelEl.innerText = activeAcc.name || 'Akun Utama';
+
+      const countBadge = document.getElementById('accountsCountBadge');
+      if (countBadge) countBadge.innerText = `${cachedAccounts.length} Akun`;
+
+      const statusBadge = document.getElementById('activeAccountStatusBadge');
+      if (statusBadge) statusBadge.innerText = `Aktif: ${activeAcc.name || 'Akun Utama'}`;
+
+      // 2. Render Dropdown List
+      const dropdownList = document.getElementById('accountDropdownList');
+      if (dropdownList) {
+        if (cachedAccounts.length === 0) {
+          dropdownList.innerHTML = '<div style="padding:10px 14px; font-size:0.8rem; color:var(--text-muted);">Belum ada akun.</div>';
+        } else {
+          dropdownList.innerHTML = cachedAccounts.map(acc => {
+            const isActive = (acc.id === activeAccountId);
+            return `
+              <div class="account-item-btn ${isActive ? 'active' : ''}" onclick="switchAccount('${escapeHtml(acc.id)}')" style="display:flex; justify-content:space-between; align-items:center; padding:8px 14px; cursor:pointer;">
+                <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:8px;">
+                  <div style="font-weight:${isActive ? '700' : '600'}; color:${isActive ? 'var(--primary)' : 'var(--text)'}; font-size:0.85rem;">
+                    ${isActive ? '✓ ' : ''}${escapeHtml(acc.name)}
+                  </div>
+                  <div style="font-size:0.75rem; color:var(--text-muted); margin-top:1px;">
+                    ${escapeHtml(acc.field_or_major || 'Umum')} &bull; CV: ${escapeHtml(acc.active_cv || 'Belum dipilih')}
+                  </div>
+                </div>
+                ${isActive ? '<span class="badge" style="background:var(--primary); color:#000; font-size:0.65rem; padding:1px 6px;">Aktif</span>' : ''}
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // 3. Render Tab 5 Quick Account Cards
+      const tabList = document.getElementById('tabAccountsQuickList');
+      if (tabList) {
+        tabList.innerHTML = cachedAccounts.map(acc => {
+          const isActive = (acc.id === activeAccountId);
+          return `
+            <div style="background:${isActive ? 'rgba(56, 189, 248, 0.12)' : '#0b1120'}; border:1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}; border-radius:8px; padding:12px; display:flex; flex-direction:column; justify-content:space-between; gap:8px;">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <strong style="color:${isActive ? 'var(--primary)' : '#fff'}; font-size:0.9rem;">${escapeHtml(acc.name)}</strong>
+                  ${isActive ? '<span class="badge" style="background:var(--primary); color:#000; font-size:0.65rem; padding:1px 6px;">Aktif</span>' : ''}
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:2px;">
+                  Jurusan: <span style="color:#cbd5e1;">${escapeHtml(acc.field_or_major || 'Umum')}</span>
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:2px;">
+                  CV: <span style="color:#cbd5e1;">${escapeHtml(acc.active_cv || 'Belum dipilih')}</span>
+                </div>
+                <div style="font-size:0.72rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  Target: ${escapeHtml((acc.target_keywords || []).join(', ') || '-')}
+                </div>
+              </div>
+              <div style="margin-top:6px; display:flex; gap:6px;">
+                ${!isActive ? `<button class="btn btn-secondary btn-sm" onclick="switchAccount('${escapeHtml(acc.id)}')" style="width:100%; font-size:0.75rem; padding:4px 8px;">Beralih ke Akun Ini</button>` : '<span style="font-size:0.75rem; color:var(--success); font-weight:600;">✓ Sedang Digunakan</span>'}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 4. Render Manage Accounts List
+      const manageList = document.getElementById('manageAccountsList');
+      if (manageList) {
+        manageList.innerHTML = cachedAccounts.map(acc => {
+          const isActive = (acc.id === activeAccountId);
+          return `
+            <div style="background:#0b1120; border:1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}; border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+              <div style="flex:1; min-width:200px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <strong style="color:${isActive ? 'var(--primary)' : '#fff'}; font-size:0.95rem;">${escapeHtml(acc.name)}</strong>
+                  ${isActive ? '<span class="badge" style="background:var(--primary); color:#000; font-size:0.7rem; padding:1px 6px;">Aktif</span>' : ''}
+                </div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+                  ${escapeHtml(acc.field_or_major || 'Umum')} &bull; CV Aktif: <span style="color:#cbd5e1;">${escapeHtml(acc.active_cv || 'Belum diatur')}</span>
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:1px;">
+                  Kata Kunci: ${escapeHtml((acc.target_keywords || []).join(', ') || '-')}
+                </div>
+              </div>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button class="btn btn-secondary btn-sm" onclick="promptRenameAccount('${escapeHtml(acc.id)}', '${escapeHtml(acc.name)}')" title="Ganti Nama Akun" style="font-size:0.75rem; padding:5px 8px;">✏️ Ubah Nama</button>
+                ${!isActive ? `<button class="btn btn-primary btn-sm" onclick="switchAccount('${escapeHtml(acc.id)}')" style="font-size:0.75rem; padding:5px 10px;">Beralih</button>` : ''}
+                ${cachedAccounts.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="deleteAccount('${escapeHtml(acc.id)}')" style="font-size:0.75rem; padding:5px 8px;" title="Hapus Akun">🗑️</button>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    async function switchAccount(accountId) {
+      if (accountId === activeAccountId) {
+        toggleAccountDropdown();
+        return;
+      }
+      try {
+        const res = await fetch('/api/accounts/switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: accountId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          activeAccountId = data.active_account_id;
+          cachedAccounts = data.accounts || cachedAccounts;
+          const menu = document.getElementById('accountDropdownMenu');
+          if (menu) menu.style.display = 'none';
+
+          await loadConfig();
+          await loadAccounts();
+          await loadCVList();
+          await loadKanban();
+          await refreshBrowserStatus();
+          alert(`Berhasil beralih ke: ${data.account ? data.account.name : 'Akun Terpilih'}`);
+        } else {
+          alert('Gagal beralih akun: ' + (data.error || 'Terjadi kendala'));
+        }
+      } catch (e) {
+        alert('Gagal beralih akun: ' + e.message);
+      }
+    }
+
+    function openCreateAccountModal() {
+      const menu = document.getElementById('accountDropdownMenu');
+      if (menu) menu.style.display = 'none';
+      document.getElementById('newAccountName').value = '';
+      document.getElementById('newAccountMajor').value = '';
+      document.getElementById('newAccountKeywords').value = '';
+      document.getElementById('newAccountExp').value = 'fresh_graduate';
+      document.getElementById('newAccountClone').checked = false;
+      document.getElementById('createAccountModal').classList.add('active');
+    }
+
+    function closeCreateAccountModal() {
+      document.getElementById('createAccountModal').classList.remove('active');
+    }
+
+    async function submitCreateAccount() {
+      const name = document.getElementById('newAccountName').value.trim();
+      const major = document.getElementById('newAccountMajor').value.trim();
+      const keywordsRaw = document.getElementById('newAccountKeywords').value.trim();
+      const exp = document.getElementById('newAccountExp').value;
+      const clone = document.getElementById('newAccountClone').checked;
+
+      if (!name) {
+        alert('Silakan masukkan nama akun / persona terlebih dahulu.');
+        return;
+      }
+
+      const keywords = keywordsRaw ? keywordsRaw.split(',').map(k => k.trim()).filter(Boolean) : [];
+
+      try {
+        const res = await fetch('/api/accounts/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name,
+            field_or_major: major,
+            target_keywords: keywords,
+            experience_level: exp,
+            clone_current: clone,
+            switch_now: true
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeCreateAccountModal();
+          activeAccountId = data.active_account_id;
+          cachedAccounts = data.accounts || cachedAccounts;
+          await loadConfig();
+          await loadAccounts();
+          await loadCVList();
+          await loadKanban();
+          await refreshBrowserStatus();
+          alert(data.message || 'Akun baru berhasil dibuat dan diaktifkan!');
+        } else {
+          alert('Gagal membuat akun: ' + (data.error || 'Terjadi kendala'));
+        }
+      } catch (e) {
+        alert('Gagal membuat akun: ' + e.message);
+      }
+    }
+
+    function openManageAccountsModal() {
+      const menu = document.getElementById('accountDropdownMenu');
+      if (menu) menu.style.display = 'none';
+      renderAccountsUI();
+      document.getElementById('manageAccountsModal').classList.add('active');
+    }
+
+    function closeManageAccountsModal() {
+      document.getElementById('manageAccountsModal').classList.remove('active');
+    }
+
+    async function promptRenameAccount(accountId, currentName) {
+      const newName = prompt('Masukkan nama baru untuk akun ini:', currentName);
+      if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+
+      try {
+        const res = await fetch('/api/accounts/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            account_id: accountId,
+            updates: { name: newName.trim() }
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          cachedAccounts = data.accounts || cachedAccounts;
+          renderAccountsUI();
+        } else {
+          alert('Gagal mengubah nama: ' + (data.error || 'Terjadi kendala'));
+        }
+      } catch (e) {
+        alert('Gagal mengubah nama akun: ' + e.message);
+      }
+    }
+
+    async function deleteAccount(accountId) {
+      if (!confirm('Apakah Anda yakin ingin menghapus akun ini? Data kriteria dan sesi login akun ini akan dihapus.')) return;
+
+      try {
+        const res = await fetch('/api/accounts/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: accountId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          activeAccountId = data.active_account_id;
+          cachedAccounts = data.accounts || cachedAccounts;
+          await loadConfig();
+          await loadAccounts();
+          await loadCVList();
+          await loadKanban();
+          alert(data.message || 'Akun berhasil dihapus.');
+        } else {
+          alert('Gagal menghapus akun: ' + (data.error || 'Terjadi kendala'));
+        }
+      } catch (e) {
+        alert('Gagal menghapus akun: ' + e.message);
+      }
+    }
+
     initActiveTab();
     restoreCachedJobs();
     checkSecurityStatus();
+    loadAccounts();
     loadConfig();
     loadCVList();
     fetchLogs();

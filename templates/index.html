@@ -39,6 +39,30 @@
         <div class="tagline">Asisten Otomatis Pencari Lowongan Kerja & Magang</div>
       </div>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <!-- PENGALIH AKUN (MULTI-ACCOUNT) -->
+        <div style="position:relative; display:inline-block;">
+          <button class="btn btn-secondary btn-sm" id="btnAccountSwitcher" onclick="toggleAccountDropdown()" title="Ganti atau kelola akun pencari kerja" style="display:flex; align-items:center; gap:6px; background:#1e293b; border-color:var(--primary); font-weight:600;">
+            <span>👤</span>
+            <span id="currentAccountLabel">Akun Utama</span>
+            <span style="font-size:0.65rem; color:var(--text-muted);">▼</span>
+          </button>
+          <div id="accountDropdownMenu" style="display:none; position:absolute; top:calc(100% + 6px); right:0; min-width:280px; background:#162032; border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,0.6); z-index:1000; padding:8px 0;">
+            <div style="padding:6px 14px; font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+              <span>Pilih Akun Aktif</span>
+              <span id="accountsCountBadge" class="badge" style="font-size:0.7rem; padding:1px 6px;">1 Akun</span>
+            </div>
+            <div id="accountDropdownList" style="max-height:220px; overflow-y:auto; padding:4px 0;"></div>
+            <div style="border-top:1px solid var(--border); padding:8px 10px 4px 10px; display:flex; flex-direction:column; gap:6px;">
+              <button class="btn btn-primary btn-sm" onclick="openCreateAccountModal()" style="width:100%; justify-content:center;">
+                ➕ Tambah Akun Baru
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="openManageAccountsModal()" style="width:100%; justify-content:center; font-size:0.8rem;">
+                ⚙️ Kelola Semua Akun
+              </button>
+            </div>
+          </div>
+        </div>
+
         <span class="badge" id="rateLimitBadge" style="color: var(--primary); border-color: rgba(56,189,248,0.4);" title="Batas aman pengiriman lamaran">🛡️ Kuota: Memuat...</span>
         <span class="badge" id="activeProfileBadge">Profil: Memuat...</span>
         <span class="badge" id="activeCVBadge" style="color: var(--primary);">CV Aktif: Memuat...</span>
@@ -375,8 +399,30 @@
 
     <!-- TAB 5: PROFILE & UMR SALARY GUIDE -->
     <div id="profileTab" class="tab-content">
+      <!-- MANAJEMEN MULTI-ACCOUNT -->
+      <div class="card" style="border: 1px solid rgba(56, 189, 248, 0.35); background: linear-gradient(135deg, #162032, #1b2942);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+          <div>
+            <div class="card-title" style="margin-bottom:2px; display:flex; align-items:center; gap:8px;">
+              <span>👥 Profil Akun Pencari Kerja (Multi-Account)</span>
+              <span class="badge" id="activeAccountStatusBadge" style="background:var(--primary); color:#000; font-weight:700;">Aktif: Akun Utama</span>
+            </div>
+            <div style="font-size:0.82rem; color:var(--text-muted);">
+              Kelola lebih dari satu persona karir (misal: Keuangan vs Digital Marketing vs Magang). Masing-masing akun memiliki kriteria lowongan, CV, dan sesi login browser tersendiri.
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-primary btn-sm" onclick="openCreateAccountModal()">➕ Tambah Akun Baru</button>
+            <button class="btn btn-secondary btn-sm" onclick="openManageAccountsModal()">⚙️ Kelola Akun</button>
+          </div>
+        </div>
+        <div id="tabAccountsQuickList" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-top:10px;">
+          <!-- Quick cards of accounts -->
+        </div>
+      </div>
+
       <div class="card">
-        <div class="card-title">1. Profil Pencari Kerja & Jurusan</div>
+        <div class="card-title">1. Profil Pencari Kerja & Jurusan (Akun Aktif)</div>
         <div class="form-row">
           <div class="form-group">
             <label>Nama Lengkap Kamu</label>
@@ -753,6 +799,62 @@
           <a href="https://github.com/XT32/job-hunter-copilot" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="font-size: 0.8rem;">🌐 Repositori GitHub</a>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="closeLegalModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL TAMBAH AKUN PENCARI KERJA BARU -->
+  <div class="modal-overlay" id="createAccountModal">
+    <div class="modal" style="max-width: 520px;">
+      <div class="card-title">➕ Tambah Akun Pencari Kerja Baru</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        Buat akun terpisah untuk persona karir berbeda (misal: Keuangan vs Digital Marketing vs Magang). Masing-masing akun memiliki target posisi, CV, dan sesi login browser tersendiri.
+      </p>
+      <div class="form-group">
+        <label>Nama Akun / Persona</label>
+        <input type="text" id="newAccountName" placeholder="Contoh: Akun Digital Marketing, Akun Magang Kemnaker">
+      </div>
+      <div class="form-group">
+        <label>Bidang / Jurusan Utama</label>
+        <input type="text" id="newAccountMajor" placeholder="Contoh: Akuntansi, Desain Grafis, IT">
+      </div>
+      <div class="form-group">
+        <label>Kata Kunci Posisi Target (Pisahkan koma)</label>
+        <input type="text" id="newAccountKeywords" placeholder="Contoh: Staff Akuntansi, Finance Staff">
+      </div>
+      <div class="form-group">
+        <label>Level Pengalaman</label>
+        <select id="newAccountExp">
+          <option value="fresh_graduate">Fresh Graduate (Lulusan Baru)</option>
+          <option value="internship">Magang / Mahasiswa</option>
+          <option value="junior">Junior (1 - 2 tahun)</option>
+          <option value="all">Semua Level</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="newAccountClone" style="width:auto;">
+          <span>Salin pengaturan kriteria dari akun aktif saat ini</span>
+        </label>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:10px; margin-top:16px;">
+        <button class="btn btn-secondary" onclick="closeCreateAccountModal()">Batal</button>
+        <button class="btn btn-primary" onclick="submitCreateAccount()">💾 Simpan &amp; Beralih ke Akun Ini</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL KELOLA SEMUA AKUN -->
+  <div class="modal-overlay" id="manageAccountsModal">
+    <div class="modal" style="max-width: 600px;">
+      <div class="card-title">⚙️ Kelola Semua Akun Pencari Kerja</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        Beralih profil, ganti nama akun, atau hapus akun yang sudah tidak digunakan. Setiap akun memiliki sesi browser login yang terpisah secara aman.
+      </p>
+      <div id="manageAccountsList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px; max-height:360px; overflow-y:auto;"></div>
+      <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; border-top:1px solid var(--border); padding-top:14px;">
+        <button class="btn btn-primary btn-sm" onclick="closeManageAccountsModal(); openCreateAccountModal();">➕ Tambah Akun Baru</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeManageAccountsModal()">Tutup</button>
       </div>
     </div>
   </div>

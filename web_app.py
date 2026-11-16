@@ -50,6 +50,14 @@ from src.storage import (
 )
 from src.local_db import get_default_db, TamperDetectedError
 from src.config import load_config, save_config, DEFAULT_CONFIG
+from src.accounts import (
+    list_accounts,
+    create_account,
+    switch_account,
+    update_account,
+    delete_account,
+    get_active_account,
+)
 from src.cover_letter import generate_cover_letter
 from src.email_sender import send_cold_email
 from src.notifier import (
@@ -222,7 +230,12 @@ class InteractiveBrowserSession:
             try:
                 with playwright_lock:
                     with sync_playwright() as p:
-                        context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
+                        context = get_browser_context(
+                            p,
+                            headless=False,
+                            slow_mo=cfg.get("slow_mo_ms", 150),
+                            account_id=cfg.get("active_account_id", "default"),
+                        )
                         page = context.new_page()
                         try:
                             hunter = HunterClass(page, cfg)
@@ -297,7 +310,12 @@ class InteractiveBrowserSession:
             try:
                 with playwright_lock:
                     with sync_playwright() as p:
-                        context = get_browser_context(p, headless=False, slow_mo=cfg.get("slow_mo_ms", 150))
+                        context = get_browser_context(
+                            p,
+                            headless=False,
+                            slow_mo=cfg.get("slow_mo_ms", 150),
+                            account_id=cfg.get("active_account_id", "default"),
+                        )
                         page = context.new_page()
                         try:
                             page.goto(url, wait_until="domcontentloaded", timeout=30000)
@@ -444,6 +462,140 @@ def update_config():
     save_config(cfg, source="ui")
     add_log("Pengaturan profil & kriteria loker diperbarui di database lokal via UI.", "info")
     return jsonify({"success": True, "config": cfg})
+
+
+# ================= MULTI-ACCOUNT ENDPOINTS =================
+@app.route("/api/accounts", methods=["GET"])
+def api_list_accounts():
+    cfg = load_config()
+    return jsonify({
+        "success": True,
+        "active_account_id": cfg.get("active_account_id", "default"),
+        "accounts": list_accounts(cfg),
+    })
+
+
+@app.route("/api/accounts/switch", methods=["POST"])
+def api_switch_account():
+    data = request.json or {}
+    target_id = data.get("account_id")
+    if not target_id:
+        return jsonify({"success": False, "error": "ID akun wajib disertakan"}), 400
+
+    cfg = load_config()
+    if browser_session.is_active():
+        browser_session.close()
+        add_log("Sesi jendela browser ditutup otomatis karena Anda beralih akun.", "info")
+
+    try:
+        target_acc, cfg = switch_account(cfg, target_id)
+        save_config(cfg, source="ui")
+        add_log(f"Beralih ke profil akun '{target_acc.get('name')}'.", "success")
+        return jsonify({
+            "success": True,
+            "active_account_id": target_id,
+            "account": target_acc,
+            "accounts": list_accounts(cfg),
+            "config": cfg,
+            "message": f"Berhasil beralih ke {target_acc.get('name')}",
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/accounts/create", methods=["POST"])
+def api_create_account():
+    data = request.json or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"success": False, "error": "Nama akun tidak boleh kosong"}), 400
+
+    clone_current = bool(data.get("clone_current", False))
+    switch_now = bool(data.get("switch_now", True))
+    field_or_major = data.get("field_or_major")
+    target_keywords = data.get("target_keywords")
+    experience_level = data.get("experience_level")
+    active_cv = data.get("active_cv")
+
+    cfg = load_config()
+    try:
+        new_acc, cfg = create_account(
+            cfg,
+            name=name,
+            clone_current=clone_current,
+            field_or_major=field_or_major,
+            target_keywords=target_keywords,
+            experience_level=experience_level,
+            active_cv=active_cv,
+        )
+        if switch_now:
+            if browser_session.is_active():
+                browser_session.close()
+            new_acc, cfg = switch_account(cfg, new_acc["id"])
+
+        save_config(cfg, source="ui")
+        add_log(f"Akun baru '{name}' berhasil dibuat{' dan diaktifkan' if switch_now else ''}.", "success")
+        return jsonify({
+            "success": True,
+            "account": new_acc,
+            "active_account_id": cfg.get("active_account_id"),
+            "accounts": list_accounts(cfg),
+            "config": cfg,
+            "message": f"Akun '{name}' berhasil dibuat!",
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/accounts/update", methods=["POST"])
+def api_update_account():
+    data = request.json or {}
+    account_id = data.get("account_id")
+    updates = data.get("updates", {})
+    if not account_id:
+        return jsonify({"success": False, "error": "ID akun wajib disertakan"}), 400
+
+    cfg = load_config()
+    try:
+        updated_acc, cfg = update_account(cfg, account_id, updates)
+        save_config(cfg, source="ui")
+        add_log(f"Data akun '{updated_acc.get('name')}' berhasil diperbarui.", "info")
+        return jsonify({
+            "success": True,
+            "account": updated_acc,
+            "accounts": list_accounts(cfg),
+            "config": cfg,
+            "message": f"Akun '{updated_acc.get('name')}' berhasil diperbarui.",
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/accounts/delete", methods=["POST"])
+def api_delete_account():
+    data = request.json or {}
+    account_id = data.get("account_id")
+    if not account_id:
+        return jsonify({"success": False, "error": "ID akun wajib disertakan"}), 400
+
+    cfg = load_config()
+    if browser_session.is_active():
+        browser_session.close()
+
+    try:
+        deleted, cfg = delete_account(cfg, account_id)
+        save_config(cfg, source="ui")
+        add_log(f"Akun '{deleted.get('name')}' berhasil dihapus.", "info")
+        return jsonify({
+            "success": True,
+            "deleted": deleted,
+            "active_account_id": cfg.get("active_account_id"),
+            "accounts": list_accounts(cfg),
+            "config": cfg,
+            "message": f"Akun '{deleted.get('name')}' berhasil dihapus.",
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
 
 
 @app.route("/api/test-telegram", methods=["POST"])
@@ -695,7 +847,12 @@ def scan_jobs():
 
     with playwright_lock:
         with sync_playwright() as p:
-            context = get_browser_context(p, headless=is_headless, slow_mo=scan_cfg.get("slow_mo_ms", 150))
+            context = get_browser_context(
+                p,
+                headless=is_headless,
+                slow_mo=scan_cfg.get("slow_mo_ms", 150),
+                account_id=scan_cfg.get("active_account_id", "default"),
+            )
             page = context.new_page()
 
             try:
@@ -770,17 +927,19 @@ def apply_job():
     add_log(f"Membuka proses melamar untuk '{title}' di {company} ({platform_name})...", "info")
 
     try:
+        active_acc = get_active_account(cfg)
+        acc_tag = f" [Akun: {active_acc.get('name', 'Akun Utama')}]"
         result = browser_session.run_apply_with_handoff(platform, job_url, title, company, cfg)
 
         if result.get("status") == "success":
-            record_job(job_url, title, company, status="applied", notes=f"Lamar via {platform_name}", source="ui")
+            record_job(job_url, title, company, status="applied", notes=f"Lamar via {platform_name}{acc_tag}", source="ui")
             limiter.record_application(platform)
             add_log(f"Lamaran '{title}' di {company} berhasil terkirim!", "success")
         elif result.get("status") == "already_applied":
-            record_job(job_url, title, company, status="applied", notes=f"Sudah dilamar sebelumnya ({platform_name})", source="ui")
+            record_job(job_url, title, company, status="applied", notes=f"Sudah dilamar sebelumnya ({platform_name}){acc_tag}", source="ui")
             add_log(f"Lowongan '{title}' di {company} ternyata sudah pernah dilamar.", "warning")
         elif result.get("status") == "external_link":
-            record_job(job_url, title, company, status="skipped", notes=f"Tautan eksternal ({platform_name})", source="ui")
+            record_job(job_url, title, company, status="skipped", notes=f"Tautan eksternal ({platform_name}){acc_tag}", source="ui")
             add_log(f"Lowongan '{title}' di {company} dialihkan ke web karir eksternal.", "info")
         elif result.get("status") in ("manual_action_needed", "login_required"):
             add_log(f"Browser dibiarkan terbuka untuk '{title}': {result.get('message')}", "warning")

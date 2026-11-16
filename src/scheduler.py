@@ -118,7 +118,7 @@ class AutoHuntScheduler:
             with sync_playwright() as p:
                 context = None
                 try:
-                    context = get_browser_context(p, headless=True, slow_mo=50)
+                    context = get_browser_context(p, headless=True, slow_mo=50, account_id=cfg.get("active_account_id", "default"))
                     page = context.new_page()
 
                     for p_name, (HunterClass, label) in self.hunter_map.items():
