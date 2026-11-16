@@ -309,7 +309,7 @@ job-hunter-copilot/
 │   └── js/app.js            # Logika antarmuka Web UI, filter, & integrasi API
 ├── templates/
 │   └── index.html           # Tampilan visual dashboard Web (Tab 1 - Tab 5)
-├── tests/                   # 21 berkas unit test lengkap (87 pengujian)
+├── tests/                   # 21 berkas unit test lengkap (91 pengujian)
 ├── start_windows.bat        # Skrip peluncur cepat 1-klik untuk Windows
 ├── start_linux.sh           # Skrip peluncur cepat 1-klik untuk Linux/macOS
 ├── web_app.py               # Server aplikasi Web Dashboard Flask
@@ -320,7 +320,7 @@ job-hunter-copilot/
 
 ## 🧪 Rangkaian Pengujian Otomatis
 
-Repositori ini dilengkapi rangkaian **87 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, hingga scheduler latar belakang):
+Repositori ini dilengkapi rangkaian **91 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, background scheduler, hingga kepatuhan legal notice & unduh source code AGPLv3):
 
 ```bash
 python3 -m unittest discover tests -v
@@ -342,7 +342,10 @@ Agar ekspektasi pengguna selaras dengan realitas implementasi teknis:
    * **Integritas (Integrity):** Tabel SQLite disegel menggunakan HMAC-SHA256 digest untuk mendeteksi modifikasi langsung di luar Web UI.
    * **Batasan Lingkungan Lokal:** Kunci enkripsi dilindungi dengan hak akses file sistem ketat (`chmod 0600`) atau OS Keyring. Untuk perlindungan maksimal terhadap akses fisik perangkat, disarankan mengaktifkan enkripsi disk penuh (*BitLocker* di Windows atau *LUKS* di Linux).
 5. **Ketahanan Selektor Portal (Scraper Maintenance):** Struktur HTML portal karir (JobStreet, Glints, Dealls, MagangHub) dapat berubah sewaktu-waktu. Gunakan modul diagnostik bawaan (`src/diagnostic.py`) atau laporkan melalui GitHub Issues/PR jika menemukan selektor yang tidak lagi cocok.
-6. **Perlindungan Terbuka & Bebas Komersial Tertutup:** Proyek ini berlisensi resmi GNU Affero General Public License v3 (AGPL-3.0) untuk memastikan seluruh kode dan modifikasinya selamanya terbuka, gratis, dan terlindungi dari eksploitasi produk komersial tertutup (*closed-source SaaS wrapper*).
+6. **Kepatuhan Lisensi Jaringan & Legal Notice (AGPLv3 Seksi 13 & Seksi 5d):**
+   * Sesuai ketentuan GNU AGPLv3, antarmuka web menyediakan tombol dan modal interaktif **"⚖️ Legal Notice & Lisensi"** di header dan footer.
+   * Setiap pengguna yang mengakses layanan melalui jaringan berhak mengunduh kode sumber lengkap (*Corresponding Source*) secara cuma-cuma melalui endpoint `/api/legal/source` atau repositori resmi.
+   * Seluruh pustaka pihak ketiga telah diaudit dan terbukti 100% kompatibel dengan AGPLv3 (Flask: BSD-3-Clause, Playwright: Apache-2.0, pypdf: BSD-3-Clause, Rich: MIT, python-dotenv: BSD-3-Clause). Antarmuka web bebas dari CDN eksternal atau aset berbayar/tertutup.
 
 ---
 
@@ -360,6 +363,10 @@ Silakan baca panduan lengkap pada [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## 📄 Lisensi
+## 📄 Lisensi & Hak Cipta
 
-Didistribusikan di bawah lisensi resmi **[GNU Affero General Public License v3 (AGPL-3.0)](LICENSE)**. Hak cipta dilindungi undang-undang.
+Hak Cipta &copy; 2024-2026 **XT32**. Hak Cipta Dilindungi Undang-Undang.
+
+Didistribusikan di bawah lisensi resmi **[GNU Affero General Public License v3 (AGPL-3.0)](LICENSE)**.
+
+Setiap modifikasi perangkat lunak yang dijalankan pada server publik/jaringan **wajib** mendistribusikan kode sumber lengkapnya secara bebas kepada seluruh pengguna jaringan (Seksi 13).

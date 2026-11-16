@@ -220,6 +220,50 @@ class TestWebSecurityAndEndpoints(unittest.TestCase):
             headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
         )
 
+    def test_api_legal_endpoint(self):
+        resp = self.client.get("/api/legal")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertIn("XT32", data.get("copyright", ""))
+        self.assertEqual(data.get("license"), "GNU Affero General Public License v3 (AGPL-3.0)")
+        self.assertIn("Seksi 13", data.get("network_copyleft_notice", ""))
+        deps = data.get("third_party_dependencies", [])
+        dep_names = [d["name"] for d in deps]
+        self.assertIn("Flask", dep_names)
+        self.assertIn("Playwright", dep_names)
+        self.assertIn("pypdf", dep_names)
+        self.assertIn("Rich", dep_names)
+
+    def test_api_legal_license_endpoint(self):
+        resp = self.client.get("/api/legal/license")
+        self.assertEqual(resp.status_code, 200)
+        text = resp.get_data(as_text=True)
+        self.assertIn("GNU AFFERO GENERAL PUBLIC LICENSE", text)
+
+    def test_api_legal_source_download(self):
+        import io
+        import zipfile
+        resp = self.client.get("/api/legal/source")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.mimetype, "application/zip")
+        zf = zipfile.ZipFile(io.BytesIO(resp.data))
+        names = zf.namelist()
+        self.assertIn("web_app.py", names)
+        self.assertIn("LICENSE", names)
+        self.assertIn("README.md", names)
+        self.assertTrue(any(n.startswith("src/") for n in names))
+
+    def test_index_page_includes_legal_notice_and_footer(self):
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn("legalNoticeModal", html)
+        self.assertIn("openLegalModal", html)
+        self.assertIn("GNU AGPLv3", html)
+        self.assertIn("2024-2026", html)
+        self.assertIn("XT32", html)
+
 
 if __name__ == "__main__":
     unittest.main()
