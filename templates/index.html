@@ -421,14 +421,18 @@
 
       <div class="card">
         <div class="card-title">3. Notifikasi Telegram Bot (Opsional)</div>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+          Terima notifikasi instan langsung di aplikasi Telegram pribadi saat loker baru yang cocok ditemukan.<br>
+          <span style="font-size:0.8rem; color:#38bdf8;">💡 <strong>Cara buat bot dalam 1 menit:</strong> Buka Telegram &gt; Cari <code>@BotFather</code> &gt; ketik <code>/newbot</code> untuk dapat Token. Lalu chat bot <code>@userinfobot</code> untuk dapat Chat ID kamu (klik START di bot kamu juga ya!).</span>
+        </p>
         <div class="form-row">
           <div class="form-group">
             <label>Bot Token Telegram</label>
-            <input type="text" id="cfgTgToken">
+            <input type="text" id="cfgTgToken" placeholder="Contoh: 7123456789:AAHxxxxxxxxxxxxxxx">
           </div>
           <div class="form-group">
             <label>Chat ID Telegram</label>
-            <input type="text" id="cfgTgChat">
+            <input type="text" id="cfgTgChat" placeholder="Contoh: 123456789">
           </div>
         </div>
         <div class="form-group">
@@ -436,6 +440,10 @@
             <input type="checkbox" id="cfgTgEnabled" style="width: auto;">
             Kirimkan notifikasi langsung ke Telegram saya saat lowongan cocok ditemukan
           </label>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="testTelegramBot()" id="btnTestTg">🧪 Tes Sambungan ke Telegram</button>
+          <span id="tgTestStatus" style="font-size: 0.85rem;"></span>
         </div>
       </div>
 

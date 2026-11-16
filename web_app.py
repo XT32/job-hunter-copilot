@@ -30,7 +30,7 @@ from src.local_db import get_default_db, TamperDetectedError
 from src.config import load_config, save_config, DEFAULT_CONFIG
 from src.cover_letter import generate_cover_letter
 from src.email_sender import send_cold_email
-from src.notifier import send_telegram_alert
+from src.notifier import send_telegram_alert, test_telegram_connection
 from src.cv_analyzer import extract_text_from_pdf, calculate_ats_match
 from src.scheduler import AutoHuntScheduler
 from src.scam_detector import check_for_red_flags
@@ -402,6 +402,27 @@ def update_config():
     save_config(cfg, source="ui")
     add_log("Pengaturan profil & kriteria loker diperbarui di database lokal via UI.", "info")
     return jsonify({"success": True, "config": cfg})
+
+
+@app.route("/api/test-telegram", methods=["POST"])
+def test_telegram_route():
+    data = request.json or {}
+    token = (data.get("bot_token") or "").strip()
+    chat_id = str(data.get("chat_id") or "").strip()
+
+    if not token or not chat_id:
+        cfg = load_config()
+        tg = cfg.get("telegram", {})
+        token = token or tg.get("bot_token", "")
+        chat_id = chat_id or tg.get("chat_id", "")
+
+    result = test_telegram_connection(bot_token=token, chat_id=chat_id)
+    if result.get("success"):
+        add_log("Tes notifikasi bot Telegram berhasil terkirim.", "success")
+    else:
+        add_log(f"Tes notifikasi bot Telegram gagal: {result.get('message')}", "warning")
+    return jsonify(result)
+
 
 
 # ================= MULTI-CV ENDPOINTS =================

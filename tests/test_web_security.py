@@ -74,6 +74,19 @@ class TestWebSecurityAndEndpoints(unittest.TestCase):
         )
         self.assertEqual(resp_del.status_code, 200)
 
+    def test_telegram_test_endpoint(self):
+        # Menguji endpoint test-telegram dengan token kosong
+        resp = self.client.post(
+            "/api/test-telegram",
+            json={"bot_token": "", "chat_id": ""},
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertFalse(data.get("success"))
+        self.assertIn("wajib diisi", data.get("message"))
+
+
 
 if __name__ == "__main__":
     unittest.main()

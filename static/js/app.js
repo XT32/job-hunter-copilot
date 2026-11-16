@@ -340,6 +340,39 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       }
     }
 
+    async function testTelegramBot() {
+      const token = document.getElementById('cfgTgToken').value.trim();
+      const chatId = document.getElementById('cfgTgChat').value.trim();
+      const statusEl = document.getElementById('tgTestStatus');
+      const btn = document.getElementById('btnTestTg');
+
+      if (!token || !chatId) {
+        statusEl.innerHTML = '<span style="color: var(--danger); font-weight:600;">[!] Isi Bot Token dan Chat ID terlebih dahulu.</span>';
+        return;
+      }
+
+      btn.disabled = true;
+      statusEl.innerHTML = '<span style="color: var(--primary);">⏳ Mengirim pesan tes ke Telegram kamu...</span>';
+
+      try {
+        const res = await fetch('/api/test-telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bot_token: token, chat_id: chatId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusEl.innerHTML = `<span style="color: var(--success); font-weight:600;">[✓] ${escapeHtml(data.message)}</span>`;
+        } else {
+          statusEl.innerHTML = `<span style="color: var(--danger); font-weight:600;">[x] ${escapeHtml(data.message)}</span>`;
+        }
+      } catch (e) {
+        statusEl.innerHTML = `<span style="color: var(--danger);">[x] Gagal menghubungi server: ${escapeHtml(e.message)}</span>`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     /* MULTI-CV LOGIC */
     async function loadCVList() {
       const container = document.getElementById('cvListContainer');
