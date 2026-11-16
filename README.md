@@ -19,7 +19,7 @@
     <img src="https://img.shields.io/badge/Interface-Flask%20Web%20Dashboard-000000.svg?logo=flask&logoColor=white" alt="Flask UI">
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">
+    <img src="https://img.shields.io/badge/License-AGPLv3-blue.svg" alt="AGPLv3 License">
   </a>
   <img src="https://img.shields.io/badge/Cost-100%25%20Free%20%28No%20Paid%20APIs%29-brightgreen.svg" alt="100% Free">
   <img src="https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg" alt="Cross Platform">
@@ -327,7 +327,7 @@ Semua pengujian berjalan secara berkala pada pipeline CI GitHub Actions lintas s
 
 1. **Penggunaan yang Bertanggung Jawab:** Aplikasi ini dibuat untuk membantu pencari kerja menghemat waktu secara terhormat. Hindari melakukan *spamming* massal atau mengabaikan relevansi kualifikasi lowongan.
 2. **Kepatuhan Terhadap Layanan Pihak Ketiga:** Otomasi beroperasi melalui peramban yang Anda kendalikan sendiri (*human-in-the-loop*). Pengguna bertanggung jawab penuh atas aktivitas akun dan kepatuhan terhadap *Terms of Service* masing-masing portal kerja.
-3. **Bebas Komersial:** Aplikasi ini bersifat open-source di bawah lisensi MIT dan ditujukan untuk kemaslahatan pencari kerja di Indonesia.
+3. **Perlindungan Terbuka & Bebas Komersial Tertutup:** Proyek ini berlisensi resmi GNU Affero General Public License v3 (AGPL-3.0) untuk memastikan seluruh kode dan modifikasinya selamanya terbuka, gratis, dan terlindungi dari eksploitasi produk komersial tertutup (closed-source SaaS wrapper).
 
 ---
 
@@ -347,4 +347,4 @@ Silakan baca panduan lengkap pada [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 📄 Lisensi
 
-Didistribusikan di bawah lisensi resmi **[MIT License](LICENSE)**. Hak cipta dilindungi undang-undang.
+Didistribusikan di bawah lisensi resmi **[GNU Affero General Public License v3 (AGPL-3.0)](LICENSE)**. Hak cipta dilindungi undang-undang.
