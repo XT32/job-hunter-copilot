@@ -83,7 +83,7 @@ flowchart TD
         TG["Bot Telegram Notifikasi & 1-Click Share"]
         ICS["Jadwal Kalender iCalendar (.ics)"]
         CSV["Rekap Pelamaran CSV (UTF-8 BOM Excel)"]
-        SEC["SQLite Lokal Terenkripsi + HMAC-SHA256 Anti-Tamper"]
+        SEC["SQLite Lokal Terproteksi (AES-256 + HMAC-SHA256 Anti-Tamper)"]
     end
 
     Portals --> SCRAPER
@@ -114,26 +114,32 @@ flowchart TD
 * **Dealls Jobs Indonesia:** Peluang kerja full-time, part-time, dan magang terkurasi.
 * **Filter Badge Otomatis:** Menyingkirkan badge promosi portal (*"Baru"*, *"Mudah Dilamar"*, *"Urgent"*, *"Aktif Merekrut"*) agar tidak mencemari judul pekerjaan atau nama perusahaan.
 
-### 2. 🛡️ Detektor Scam & Red Flag Heuristik (8 Lapisan Keamanan)
-Menganalisis teks lowongan secara heuristik lokal sebelum pengguna melamar:
-* ⚠️ **Klausul Tahan Ijazah Asli:** Mendeteksi syarat penahanan dokumen asli atau denda penalti sepihak.
-* ⚠️ **Pungutan Biaya di Muka:** Mendeteksi uang seragam, biaya formulir, psikotes berbayar, dan modus penggantian tiket travel agen BUMN palsu.
-* ⚠️ **Penyusupan File APK:** Menandai lowongan yang mengarahkan pelamar mengunduh file `.apk` mencurigakan (*surat_undangan.apk*).
-* ⚠️ **Modus Tugas E-Commerce / Deposit Saldo:** Menolak skema tugas pesanan online (*like-subscribe*, top-up deposit awal).
-* ⚠️ **Modus Paylater / Pinjol / Buka Rekening Fiktif:** Mendeteksi jebakan aktivasi akun kredit digital, kuota limit paylater, atau kewajiban selfie KTP dengan buku rekening.
-* ⚠️ **Pialang Berjangka / Forex Bodong:** Mendeteksi perusahaan investasi komoditas berjangka terselubung.
-* ⚠️ **Lokasi Rawan Interview Fiktif:** Menandai alamat ruko di kawasan rawan modus pemerasan rekrutmen (Senen, Roxy, Harmoni, dll).
-* ⚠️ **Iming-iming Tanpa Seleksi:** Mendeteksi klaim tidak realistis seperti *"Pasti diterima 100%"* atau *"Kerja tanpa tes gaji jutaan per hari"*.
+### 2. 🛡️ Detektor Indikasi Risiko & Red Flag Heuristik (8 Pola Teks)
+Menganalisis teks lowongan secara heuristik lokal sebelum pengguna memutuskan melamar:
+* ⚠️ **Klausul Tahan Ijazah Asli:** Pola penahanan dokumen asli atau denda penalti sepihak.
+* ⚠️ **Pungutan Biaya di Muka:** Pola uang seragam, biaya formulir, psikotes berbayar, dan modus penggantian tiket travel agen BUMN palsu.
+* ⚠️ **Penyusupan File APK:** Pola arahan mengunduh file `.apk` mencurigakan (*surat_undangan.apk*).
+* ⚠️ **Modus Tugas E-Commerce / Deposit Saldo:** Skema tugas pesanan online (*like-subscribe*, top-up deposit awal).
+* ⚠️ **Modus Paylater / Pinjol / Buka Rekening Fiktif:** Pola aktivasi akun kredit digital, kuota limit paylater, atau kewajiban selfie KTP dengan buku rekening.
+* ⚠️ **Pialang Berjangka / Forex:** Indikasi perusahaan investasi komoditas berjangka.
+* ⚠️ **Lokasi Rawan Interview Fiktif:** Alamat ruko di kawasan rawan modus penipuan rekrutmen massal (Senen, Roxy, Harmoni, dll).
+* ⚠️ **Iming-iming Tanpa Seleksi:** Klaim tidak realistis seperti *"Pasti diterima 100%"* atau *"Kerja tanpa tes gaji jutaan per hari"*.
 
-### 3. 🎯 Multi-CV & In-Memory ATS Matcher
+> ⚠️ **Catatan Transparansi Rekayasa:** Detektor ini menggunakan pencocokan pola kata kunci (heuristik teks), **bukan verifikasi legalitas hukum resmi perusahaan**. Fitur ini dirancang sebagai sistem peringatan dini (indikasi risiko) agar pelamar tetap waspada dan melakukan riset mandiri.
+
+### 3. 🎯 Multi-CV & In-Memory ATS Matcher (Keyword Overlap Scorer)
 * **Kelola Ragam Versi CV:** Simpan beberapa variasi CV (misal: *CV-Backend.pdf*, *CV-Finance.pdf*, *CV-Admin.pdf*) di folder `attachments/`.
 * **Ganti CV Aktif 1-Klik:** Tetapkan CV aktif langsung dari antarmuka Web Dashboard.
 * **Ekstraksi Kata Kunci Cerdas:** Mendukung pengenalan kata kunci teknis 2 huruf (*UI*, *UX*, *QA*, *AI*, *ML*, *Go*, *JS*, *TS*, *IT*, *HR*) serta simbol khusus (*C++*, *C#*, *.NET*).
-* **Skor Kecocokan ATS:** Menghitung persentase kecocokan kualifikasi CV terhadap deskripsi pekerjaan secara instan dan menampilkan saran kata kunci yang perlu ditambahkan.
+* **Skor Kecocokan Kata Kunci:** Menghitung overlap persentase kualifikasi teknis CV terhadap deskripsi pekerjaan secara instan dan menampilkan saran kata kunci yang perlu ditambahkan.
+
+> ℹ️ **Catatan:** Fitur ini menghitung kemiripan kata kunci & keahlian teknis (*keyword overlap score*), bukan simulator mesin ATS berpemilik proprietary vendor seperti Workday atau Taleo.
 
 ### 4. 💰 Panduan Standar Gaji & Rekomendasi UMR 2024/2025
 * **Database UMR/UMK Resmi:** Memuat data upah minimum untuk DKI Jakarta, Bodetabek, Karawang, Surabaya, Bandung, Semarang, Yogyakarta, Medan, Bali, Makassar, Balikpapan, hingga Jayapura.
 * **Kalkulator Rentang Gaji Sehat:** Memberikan rekomendasi rentang gaji realistis berdasarkan level pengalaman (*Internship*, *Fresh Graduate*, *Junior*, *Mid*, *Senior*) agar pelamar terhindar dari mengisi angka di bawah upah layak.
+
+> ℹ️ **Catatan Penggunaan 2026+:** Data UMR/UMK 2024/2025 berfungsi sebagai garis dasar (*baseline benchmark*). Pengguna dapat menyesuaikan target gaji personal di menu pengaturan sesuai laju inflasi.
 
 ### 5. 🤖 Auto-Fill Pertanyaan Screening & Wizard Formulir
 * Mengisi kuesioner umum saat pop-up lamaran muncul di portal:
@@ -173,9 +179,10 @@ Menganalisis teks lowongan secara heuristik lokal sebelum pengguna melamar:
 * **Ekspor Kalender Wawancara (.ics):** Unduh jadwal wawancara kerja dalam format standar RFC 5545 untuk diimpor ke Google Calendar, Outlook, atau Apple Calendar.
 * **Ekspor CSV Kompatibel Excel:** File CSV hasil ekspor dilengkapi penanda UTF-8 BOM (`utf-8-sig`) dan kolom `Platform` lengkap agar terbuka rapi tanpa teks berantakan di Microsoft Excel.
 
-### 11. 💾 Cadangan Data & Pemulihan Penuh (Backup & Restore JSON)
+### 11. 💾 Cadangan Data Portabel & Pemulihan (Backup & Restore JSON)
 * **Cadangkan 1-Klik:** Unduh seluruh konfigurasi profil, pengaturan screening, bank QA, dan riwayat lamaran dalam satu file `backup_loker_cli.json`.
 * **Pulihkan 1-Klik:** Unggah kembali berkas cadangan saat berganti komputer atau install ulang tanpa kehilangan data riwayat atau konfigurasi.
+* **Format Portabel Transparan:** Berkas cadangan diekspor dalam format JSON terbuka agar mudah diarsipkan pengguna secara mandiri.
 
 ---
 
@@ -302,7 +309,7 @@ job-hunter-copilot/
 │   └── js/app.js            # Logika antarmuka Web UI, filter, & integrasi API
 ├── templates/
 │   └── index.html           # Tampilan visual dashboard Web (Tab 1 - Tab 5)
-├── tests/                   # 21 berkas unit test lengkap (84 pengujian)
+├── tests/                   # 21 berkas unit test lengkap (87 pengujian)
 ├── start_windows.bat        # Skrip peluncur cepat 1-klik untuk Windows
 ├── start_linux.sh           # Skrip peluncur cepat 1-klik untuk Linux/macOS
 ├── web_app.py               # Server aplikasi Web Dashboard Flask
@@ -313,7 +320,7 @@ job-hunter-copilot/
 
 ## 🧪 Rangkaian Pengujian Otomatis
 
-Repositori ini dilengkapi rangkaian **84 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi scam, keamanan HMAC database, origin CSRF, integrasi email, kalender, hingga scheduler):
+Repositori ini dilengkapi rangkaian **87 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, hingga scheduler latar belakang):
 
 ```bash
 python3 -m unittest discover tests -v
@@ -323,11 +330,19 @@ Semua pengujian berjalan secara berkala pada pipeline CI GitHub Actions lintas s
 
 ---
 
-## ⚖️ Etika Penggunaan & Disclaimer
+## ⚖️ Etika Penggunaan & Catatan Transparansi Rekayasa
 
-1. **Penggunaan yang Bertanggung Jawab:** Aplikasi ini dibuat untuk membantu pencari kerja menghemat waktu secara terhormat. Hindari melakukan *spamming* massal atau mengabaikan relevansi kualifikasi lowongan.
-2. **Kepatuhan Terhadap Layanan Pihak Ketiga:** Otomasi beroperasi melalui peramban yang Anda kendalikan sendiri (*human-in-the-loop*). Pengguna bertanggung jawab penuh atas aktivitas akun dan kepatuhan terhadap *Terms of Service* masing-masing portal kerja.
-3. **Perlindungan Terbuka & Bebas Komersial Tertutup:** Proyek ini berlisensi resmi GNU Affero General Public License v3 (AGPL-3.0) untuk memastikan seluruh kode dan modifikasinya selamanya terbuka, gratis, dan terlindungi dari eksploitasi produk komersial tertutup (closed-source SaaS wrapper).
+Agar ekspektasi pengguna selaras dengan realitas implementasi teknis:
+
+1. **Penggunaan yang Bertanggung Jawab (*Human-in-the-Loop*):** Aplikasi ini dirancang sebagai asisten pribadi pencari kerja, bukan bot pengirim spam massal. Pengguna memegang kendali penuh atas tombol kirim akhir (*Submit*) demi menjaga reputasi profesional kandidat.
+2. **Realitas Anti-Detection Peramban:** Penyamaran Playwright (stealth headers, masking user-agent, dan randomized delay manusia) membantu meminimalkan pemblokiran otomatis standar. Namun, penyamaran ini **tidak menjamin 100% bebas blokir** jika portal menerapkan CAPTCHA ketat atau mendeteksi lonjakan volume lalu lintas. Patuhi rate limit wajar.
+3. **Pencocokan Kata Kunci ATS (*Keyword Overlap*):** Skor ATS adalah kalkulasi persentase kemiripan kata kunci & kompetensi teknis dari CV terhadap teks lowongan. Fitur ini **bukan replika sistem proprietary vendor ATS** (seperti Workday, Taleo, atau Greenhouse).
+4. **Keamanan Data Lokal (Enkripsi vs Integritas):**
+   * **Kerahasiaan (Confidentiality):** Token sensitif (seperti token bot Telegram & password SMTP) dienkripsi menggunakan AES-256 (AES-GCM).
+   * **Integritas (Integrity):** Tabel SQLite disegel menggunakan HMAC-SHA256 digest untuk mendeteksi modifikasi langsung di luar Web UI.
+   * **Batasan Lingkungan Lokal:** Kunci enkripsi dilindungi dengan hak akses file sistem ketat (`chmod 0600`) atau OS Keyring. Untuk perlindungan maksimal terhadap akses fisik perangkat, disarankan mengaktifkan enkripsi disk penuh (*BitLocker* di Windows atau *LUKS* di Linux).
+5. **Ketahanan Selektor Portal (Scraper Maintenance):** Struktur HTML portal karir (JobStreet, Glints, Dealls, MagangHub) dapat berubah sewaktu-waktu. Gunakan modul diagnostik bawaan (`src/diagnostic.py`) atau laporkan melalui GitHub Issues/PR jika menemukan selektor yang tidak lagi cocok.
+6. **Perlindungan Terbuka & Bebas Komersial Tertutup:** Proyek ini berlisensi resmi GNU Affero General Public License v3 (AGPL-3.0) untuk memastikan seluruh kode dan modifikasinya selamanya terbuka, gratis, dan terlindungi dari eksploitasi produk komersial tertutup (*closed-source SaaS wrapper*).
 
 ---
 

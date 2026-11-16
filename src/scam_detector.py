@@ -1,6 +1,12 @@
 """
-Modul Detektor Lowongan Zonk, Scam, Pialang Berjangka & Klausul Tahan Ijazah.
+Modul Detektor Indikasi Risiko & Pola Red Flag Lowongan Kerja (Scam Heuristic).
 Berjalan 100% lokal tanpa API berbayar menggunakan heuristik pola kata kunci.
+
+PENTING (DISCLAIMER HUKUM & REKAYASA):
+Deteksi ini bekerja berbasis heuristik pencocokan pola teks (keyword pattern matching)
+dan TIDAK mewakili verifikasi legalitas resmi suatu badan usaha/perusahaan.
+Hasil deteksi harus dipahami sebagai "Indikasi Risiko" guna meningkatkan kehati-hatian
+pencari kerja, BUKAN vonis hukum bahwa perusahaan tersebut pasti melakukan penipuan.
 """
 
 import re
@@ -183,10 +189,11 @@ def check_for_red_flags(title: str, company: str, description: str = "", locatio
     risk_level = "danger" if has_danger else "warning"
 
     advice = (
-        "PERINGATAN: Perusahaan kredibel TIDAK PERNAH memungut biaya tes/seragam dalam bentuk apa pun "
-        "dan dilarang menahan ijazah asli. Hindari menyerahkan uang atau dokumen berharga!"
+        "INDIKASI RISIKO TINGGI: Teks lowongan memuat pola red flag (klausul pungutan biaya / tahan ijazah / file APK / deposit / paylater). "
+        "Perusahaan kredibel tidak memungut biaya tes/seragam. Perhatian: ini adalah deteksi heuristik pola teks, bukan vonis hukum resmi. Hindari menyerahkan uang atau dokumen berharga!"
         if risk_level == "danger" else
-        "WASPADA: Lakukan riset mandiri terkait kredibilitas perusahaan dan model bisnisnya sebelum menghadiri interview."
+        "INDIKASI RISIKO SEDANG: Terdeteksi pola kata kunci berisiko (alamat ruko rawan / komoditas berjangka). "
+        "Lakukan riset mandiri terkait kredibilitas perusahaan sebelum menghadiri interview."
     )
 
     return {

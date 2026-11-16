@@ -701,8 +701,9 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
           const safeFlags = (job.red_flag.flags || []).map(f => escapeHtml(f)).join(' • ');
           redFlagHtml = `
             <div class="red-flag-box ${cls}">
-              <strong>⚠️ PERINGATAN POTENSI RED FLAG:</strong> ${safeFlags}<br>
+              <strong>⚠️ INDIKASI RISIKO RED FLAG:</strong> ${safeFlags}<br>
               <span style="font-size:0.75rem; opacity:0.9;">${escapeHtml(job.red_flag.advice || '')}</span>
+              <div style="font-size:0.68rem; opacity:0.75; margin-top:3px; font-style:italic;">*Deteksi heuristik kata kunci, bukan vonis legalitas perusahaan. Lakukan verifikasi mandiri.</div>
             </div>
           `;
         }

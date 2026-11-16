@@ -24,6 +24,7 @@ class AutoHuntScheduler:
         self.running = False
         self.thread = None
         self.last_run = None
+        self.interval_minutes = 120
         self.total_discovered = 0
         self.last_summary = {}
         self._seen_urls = set()
@@ -52,6 +53,7 @@ class AutoHuntScheduler:
         if self.running:
             return False
 
+        self.interval_minutes = interval_minutes
         self.running = True
 
         def loop():
@@ -128,7 +130,9 @@ class AutoHuntScheduler:
 
                                 # Kirim alert Telegram jika diaktifkan & tidak terindikasi scam berat
                                 if tg_enabled:
-                                    tag = " ⚠️ [Periksa Red Flag]" if rf.get("is_suspicious") else ""
+                                    tag = ""
+                                    if rf.get("is_red_flag"):
+                                        tag = " 🚨 [BAHAYA SCAM]" if rf.get("risk_level") == "danger" else " ⚠️ [Periksa Red Flag]"
                                     send_telegram_alert(
                                         title=f"{job.get('title')}{tag}",
                                         company=job.get("company", "Perusahaan"),
@@ -168,6 +172,7 @@ class AutoHuntScheduler:
     def get_status(self) -> dict:
         return {
             "active": self.running,
+            "interval_minutes": getattr(self, "interval_minutes", 120),
             "last_run": self.last_run or "Belum pernah berjalan",
             "total_discovered": self.total_discovered,
             "last_summary": self.last_summary,
