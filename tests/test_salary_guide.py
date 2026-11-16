@@ -10,6 +10,12 @@ class TestSalaryGuide(unittest.TestCase):
         umr = get_umr_by_location("Karawang Barat")
         self.assertEqual(umr, 5257834)
 
+    def test_get_umr_lampung_and_jayapura(self):
+        umr_lpg = get_umr_by_location("Bandar Lampung")
+        self.assertEqual(umr_lpg, 3103631)
+        umr_jyp = get_umr_by_location("Jayapura")
+        self.assertEqual(umr_jyp, 4024270)
+
     def test_get_umr_unknown_fallback(self):
         umr = get_umr_by_location("Kota Antah Berantah")
         self.assertEqual(umr, 3500000)

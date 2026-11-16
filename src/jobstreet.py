@@ -75,31 +75,31 @@ class JobstreetHunter(BaseJobHunter):
                     location = ""
                     description = ""
 
-                    if container.is_visible():
+                    if container.is_visible(timeout=500):
                         try:
                             company_el = container.locator("[data-automation='jobCompany']").first
-                            if company_el.is_visible():
+                            if company_el.is_visible(timeout=400):
                                 company = company_el.inner_text().strip()
                         except Exception:
                             pass
 
                         try:
                             salary_el = container.locator("[data-automation='jobSalary']").first
-                            if salary_el.is_visible():
+                            if salary_el.is_visible(timeout=300):
                                 salary = salary_el.inner_text().strip()
                         except Exception:
                             pass
 
                         try:
                             loc_el = container.locator("[data-automation='jobLocation']").first
-                            if loc_el.is_visible():
+                            if loc_el.is_visible(timeout=300):
                                 location = loc_el.inner_text().strip()
                         except Exception:
                             pass
 
                         try:
                             desc_el = container.locator("[data-automation='jobShortDescription'], [data-automation='jobSnippet'], span[class*='teaser']").first
-                            if desc_el.is_visible():
+                            if desc_el.is_visible(timeout=400):
                                 description = desc_el.inner_text().strip()
                         except Exception:
                             pass

@@ -54,7 +54,7 @@ class DeallsHunter(BaseJobHunter):
                     href = card.get_attribute("href")
                     if not href:
                         child_a = card.locator("a").first
-                        if child_a.is_visible():
+                        if child_a.count() > 0:
                             href = child_a.get_attribute("href")
 
                     if not href or ("/job/" not in href and "/jobs/" not in href):

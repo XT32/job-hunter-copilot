@@ -56,5 +56,27 @@ class TestScamDetector(unittest.TestCase):
         self.assertEqual(res["risk_level"], "danger")
         self.assertTrue(any("Iming-iming" in f for f in res["flags"]))
 
+    def test_detect_apk_scam(self):
+        res = check_for_red_flags(
+            title="Customer Service",
+            company="PT Citra Abadi",
+            description="Silakan unduh surat_undangan.apk untuk jadwal dan lokasi interview.",
+            location="Bekasi"
+        )
+        self.assertTrue(res["is_red_flag"])
+        self.assertEqual(res["risk_level"], "danger")
+        self.assertTrue(any("APK" in f for f in res["flags"]))
+
+    def test_detect_deposit_task_scam(self):
+        res = check_for_red_flags(
+            title="Freelance Task Assistant",
+            company="Online Mart",
+            description="Kandidat wajib melakukan top up saldo awal untuk menyelesaikan tugas pesanan.",
+            location="Remote"
+        )
+        self.assertTrue(res["is_red_flag"])
+        self.assertEqual(res["risk_level"], "danger")
+        self.assertTrue(any("Deposit" in f for f in res["flags"]))
+
 if __name__ == "__main__":
     unittest.main()

@@ -33,6 +33,30 @@ Terima kasih atas kesempatan yang diberikan oleh {company}.
 
 Hormat saya,
 {applicant_name}
+{contact_info}""",
+
+    "english_formal": """Dear Hiring Team at {company},
+
+I am writing to express my strong interest in the {role} position currently open at {company}.
+
+With an educational background in {major} and practical proficiency in {skills}, I have developed a strong foundation to solve complex challenges, collaborate effectively, and deliver measurable results. I am confident that my dedication and adaptability will make an immediate positive contribution to {company}.
+
+Thank you for your time and consideration. I would welcome the opportunity to discuss my qualifications further in an interview.
+
+Sincerely,
+{applicant_name}
+{contact_info}""",
+
+    "english_fresh_grad": """Dear Hiring Manager at {company},
+
+I am excited to submit my application for the {role} role at {company}. As a proactive graduate in {major}, I have been closely following {company}'s achievements and would love the opportunity to contribute to your mission.
+
+Throughout my academic coursework and hands-on projects, I have developed solid skills in {skills}. I consider myself a fast learner and enthusiastic problem-solver who thrives in dynamic and collaborative environments.
+
+Thank you for considering my application. I look forward to the possibility of discussing how my background fits your team.
+
+Best regards,
+{applicant_name}
 {contact_info}"""
 }
 

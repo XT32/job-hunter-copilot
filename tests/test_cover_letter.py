@@ -22,5 +22,17 @@ class TestCoverLetter(unittest.TestCase):
         self.assertIn("Program Pemagangan", letter)
         self.assertIn("Kementerian BUMN", letter)
 
+    def test_generate_english_formal_cover_letter(self):
+        letter = generate_cover_letter("Software Engineer", "Google Inc", self.profile, preset="english_formal")
+        self.assertIn("Dear Hiring Team at Google Inc", letter)
+        self.assertIn("Software Engineer", letter)
+        self.assertIn("Budi Pratama", letter)
+
+    def test_generate_english_fresh_grad_cover_letter(self):
+        letter = generate_cover_letter("Junior DevOps", "Tokopedia", self.profile, preset="english_fresh_grad")
+        self.assertIn("Dear Hiring Manager at Tokopedia", letter)
+        self.assertIn("Junior DevOps", letter)
+        self.assertIn("Budi Pratama", letter)
+
 if __name__ == "__main__":
     unittest.main()

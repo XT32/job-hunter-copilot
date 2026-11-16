@@ -69,6 +69,24 @@ LOKASI_RAWAN_PATTERNS = [
     r"ruko\s+grand\s+mall\s+bekasi"
 ]
 
+# 6. Modus Malware APK / Dokumen Undangan Palsu
+MALWARE_APK_PATTERNS = [
+    r"\.apk\b",
+    r"unduh\s+surat\s+undangan\.apk",
+    r"install\s+file\s+apk",
+    r"surat_panggilan_interview\.apk",
+    r"klik\s+link\s+apk"
+]
+
+# 7. Modus Tugas Berbayar / Deposit Saldo E-Commerce
+DEPOSIT_TASK_PATTERNS = [
+    r"deposit\s+saldo",
+    r"top\s*up\s+saldo\s+awal",
+    r"tugas\s+pesanan\s+e-commerce",
+    r"transfer\s+deposit",
+    r"menyelesaikan\s+misi\s+pesanan"
+]
+
 def check_for_red_flags(title: str, company: str, description: str = "", location: str = "") -> dict:
     """
     Menganalisis teks lowongan kerja untuk mendeteksi potensi bahaya, klausul tahan ijazah, atau penipuan.
@@ -114,6 +132,18 @@ def check_for_red_flags(title: str, company: str, description: str = "", locatio
             flags.append("Alamat Ruko / Titik Lokasi Rawan Modus Interview Fiktif")
             break
 
+    # Cek penyusupan file APK berbahaya (Tingkat DANGER)
+    for p in MALWARE_APK_PATTERNS:
+        if re.search(p, full_text):
+            flags.append("Indikasi File APK Mencurigakan / Malware Undangan")
+            break
+
+    # Cek permintaan deposit saldo atau misi pesanan (Tingkat DANGER)
+    for p in DEPOSIT_TASK_PATTERNS:
+        if re.search(p, full_text):
+            flags.append("Modus Deposit Saldo / Misi Pesanan E-Commerce Berbayar")
+            break
+
     is_red_flag = len(flags) > 0
     if not is_red_flag:
         return {
@@ -125,7 +155,7 @@ def check_for_red_flags(title: str, company: str, description: str = "", locatio
 
     # Tentukan risk level
     has_danger = any(
-        "Tahan Ijazah" in f or "Permintaan Uang" in f or "Iming-iming" in f
+        "Tahan Ijazah" in f or "Permintaan Uang" in f or "Iming-iming" in f or "APK" in f or "Deposit" in f
         for f in flags
     )
     risk_level = "danger" if has_danger else "warning"

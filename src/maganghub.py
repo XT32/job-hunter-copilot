@@ -57,7 +57,7 @@ class MagangHubHunter(BaseJobHunter):
                     href = card.get_attribute("href")
                     if not href:
                         child_link = card.locator("a").first
-                        if child_link.is_visible():
+                        if child_link.count() > 0:
                             href = child_link.get_attribute("href")
 
                     if not href or ("lowongan" not in href and "detail" not in href):

@@ -185,7 +185,7 @@ class ScreeningAutoFiller:
             salary_inputs = self.page.locator("input[placeholder*='gaji' i], input[placeholder*='salary' i], input[name*='salary' i], input[name*='gaji' i], input[aria-label*='gaji' i]").all()
             for inp in salary_inputs:
                 try:
-                    if inp.is_visible() and not inp.input_value():
+                    if inp.is_visible(timeout=250) and not inp.input_value():
                         inp.fill(str(self.defaults.get("expected_salary", "6000000")))
                         filled_count += 1
                 except Exception:
@@ -194,7 +194,7 @@ class ScreeningAutoFiller:
             exp_inputs = self.page.locator("input[placeholder*='pengalaman' i], input[placeholder*='experience' i], input[name*='year' i]").all()
             for inp in exp_inputs:
                 try:
-                    if inp.is_visible() and not inp.input_value():
+                    if inp.is_visible(timeout=250) and not inp.input_value():
                         inp.fill(str(self.defaults.get("years_of_experience", "1")))
                         filled_count += 1
                 except Exception:
@@ -203,7 +203,7 @@ class ScreeningAutoFiller:
             dom_inputs = self.page.locator("input[placeholder*='domisili' i], input[placeholder*='kota' i], input[placeholder*='lokasi' i]").all()
             for inp in dom_inputs:
                 try:
-                    if inp.is_visible() and not inp.input_value():
+                    if inp.is_visible(timeout=250) and not inp.input_value():
                         inp.fill(str(self.defaults.get("domicile", "Jakarta")))
                         filled_count += 1
                 except Exception:
@@ -213,7 +213,7 @@ class ScreeningAutoFiller:
             all_inputs = self.page.locator("input[type='text'], input[type='number'], input:not([type]), textarea").all()
             for inp in all_inputs:
                 try:
-                    if not inp.is_visible():
+                    if not inp.is_visible(timeout=250):
                         continue
                     if inp.input_value().strip():
                         continue
@@ -231,7 +231,7 @@ class ScreeningAutoFiller:
             selects = self.page.locator("select").all()
             for sel in selects:
                 try:
-                    if not sel.is_visible():
+                    if not sel.is_visible(timeout=250):
                         continue
                     current_val = sel.input_value()
                     q_text = self._get_question_context(sel)
@@ -251,7 +251,7 @@ class ScreeningAutoFiller:
             handled_radio_names = set()
             for grp in groups:
                 try:
-                    if not grp.is_visible():
+                    if not grp.is_visible(timeout=250):
                         continue
                     radios = grp.locator("input[type='radio']").all()
                     if not radios:

@@ -27,6 +27,9 @@ UMR_DATABASE = {
     "kota bandung": 4209309,
     "kabupaten bandung": 3527967,
     "cimahi": 3627880,
+    "purwakarta": 4499768,
+    "sukabumi": 3400000,
+    "cirebon": 2533038,
 
     # Banten
     "tangerang": 4760289,
@@ -41,6 +44,8 @@ UMR_DATABASE = {
     "kota surabaya": 4725479,
     "gresik": 4642031,
     "sidoarjo": 4638582,
+    "pasuruan": 4635133,
+    "mojokerto": 4624787,
     "malang": 3309144,
     "kota malang": 3309144,
 
@@ -60,10 +65,19 @@ UMR_DATABASE = {
     "batam": 4685050,
     "pekanbaru": 3451184,
     "palembang": 3677591,
+    "bandar lampung": 3103631,
+    "lampung": 3103631,
     "makassar": 3643751,
     "denpasar": 3096523,
     "bali": 3096523,
-    "balikpapan": 3475595
+    "balikpapan": 3475595,
+    "samarinda": 3497124,
+    "pontianak": 2840206,
+    "banjarmasin": 3379513,
+    "manado": 3590000,
+    "mataram": 2685044,
+    "lombok": 2685044,
+    "jayapura": 4024270
 }
 
 DEFAULT_NATIONAL_BENCHMARK = 3500000
