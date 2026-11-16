@@ -29,7 +29,7 @@ from flask import Flask, render_template, request, jsonify, send_file, send_from
 from werkzeug.utils import secure_filename
 from playwright.sync_api import sync_playwright
 
-from src.browser import get_browser_context
+from src.browser import get_browser_context, optimize_page_resources
 from src.glints import GlintsHunter
 from src.jobstreet import JobstreetHunter
 from src.maganghub import MagangHubHunter
@@ -79,6 +79,13 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # Maksimal 10 MB untuk uplo
 playwright_lock = threading.Lock()
 
 SERVER_CSRF_TOKEN = secrets.token_hex(24)
+
+
+def get_current_account_id() -> str:
+    try:
+        return load_config().get("active_account_id", "default")
+    except Exception:
+        return "default"
 
 
 @app.before_request
@@ -237,6 +244,7 @@ class InteractiveBrowserSession:
                             account_id=cfg.get("active_account_id", "default"),
                         )
                         page = context.new_page()
+                        optimize_page_resources(page, block_media=False)
                         try:
                             hunter = HunterClass(page, cfg)
                             res = hunter.inspect_and_apply(job_url, job_title=title, company=company)
@@ -317,6 +325,7 @@ class InteractiveBrowserSession:
                             account_id=cfg.get("active_account_id", "default"),
                         )
                         page = context.new_page()
+                        optimize_page_resources(page, block_media=False)
                         try:
                             page.goto(url, wait_until="domcontentloaded", timeout=30000)
                         except Exception as e:
@@ -800,7 +809,7 @@ def complete_manual_apply():
     if job_url:
         record_job(job_url, title, company, status="applied", notes=f"Selesai via Browser Copilot ({platform_name})", source="ui")
         try:
-            get_limiter().record_application(platform)
+            get_limiter().record_application(platform, get_current_account_id())
         except Exception:
             pass
         add_log(f"Lamaran '{title}' di {company} dikonfirmasi terkirim & dicatat ke Kanban.", "success")
@@ -854,6 +863,7 @@ def scan_jobs():
                 account_id=scan_cfg.get("active_account_id", "default"),
             )
             page = context.new_page()
+            optimize_page_resources(page, block_media=True)
 
             try:
                 add_log(f"Membuka portal {platform_name} dan mencari lowongan sesuai profil...", "info")
@@ -911,7 +921,8 @@ def apply_job():
 
     # Lindungi akun dari shadowban/blokir via safe rate limiter
     limiter = get_limiter()
-    allowed, quota_reason, quota_stats = limiter.check_quota(platform)
+    active_acc = get_current_account_id()
+    allowed, quota_reason, quota_stats = limiter.check_quota(platform, active_acc)
     if not allowed:
         add_log(f"BATAS AMAN KUOTA TERCAPAI: {quota_reason}", "warning")
         return jsonify({
@@ -1203,7 +1214,8 @@ def restore_backup():
 # ================= RATE LIMITS & QUOTA =================
 @app.route("/api/rate-limits", methods=["GET"])
 def api_rate_limits():
-    return jsonify({"success": True, "quotas": get_limiter().get_all_quotas()})
+    acc_id = request.args.get("account_id") or get_current_account_id()
+    return jsonify({"success": True, "quotas": get_limiter().get_all_quotas(acc_id)})
 
 
 # ================= DIAGNOSTIC & DEBUG BUNDLE =================
@@ -1512,11 +1524,26 @@ def api_download_source():
     )
 
 
+def _find_available_port(host: str, starting_port: int, max_attempts: int = 10) -> int:
+    import socket
+    for p in range(starting_port, starting_port + max_attempts):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            target_host = host if host not in ("0.0.0.0", "") else "127.0.0.1"
+            if s.connect_ex((target_host, p)) != 0:
+                return p
+    return starting_port
+
+
 def start_server(port=5000, auto_open=True):
-    port = int(os.environ.get("PORT", port))
+    requested_port = int(os.environ.get("PORT", port))
     host = os.environ.get("HOST", "127.0.0.1")
     if os.environ.get("AUTO_OPEN", "").lower() in ("0", "false", "no"):
         auto_open = False
+
+    port = _find_available_port(host, requested_port)
+    if port != requested_port:
+        print(f"[*] Port {requested_port} sedang digunakan. Menggunakan port alternatif: {port}")
 
     # Inisialisasi database lokal saat mulai
     try:

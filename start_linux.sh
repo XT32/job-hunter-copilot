@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
 echo "========================================================="
-echo "     LOKER-COPILOT WEB DASHBOARD (UI-FIRST / LINUX)      "
+echo "   JOB HUNTER COPILOT WEB DASHBOARD (LINUX / MACOS)      "
 echo "========================================================="
 echo ""
 
@@ -16,15 +16,18 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 if [ ! -d ".venv" ]; then
-    echo "[*] Membuat Virtual Environment (.venv)..."
+    echo "[*] Menyiapkan environment pertama kali (.venv)..."
     python3 -m venv .venv
 fi
 
 source .venv/bin/activate
 
-echo "[*] Memeriksa modul dan browser Playwright..."
-python3 -m pip install -r requirements.txt --quiet
-playwright install chromium
+if [ ! -f ".venv/.installed" ]; then
+    echo "[*] Memeriksa modul dan browser Playwright (setup awal)..."
+    python3 -m pip install -r requirements.txt --quiet
+    playwright install chromium
+    touch .venv/.installed
+fi
 
 echo ""
 echo "[*] Membuka Web Dashboard di browser (http://127.0.0.1:5000)..."

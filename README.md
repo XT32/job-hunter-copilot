@@ -268,7 +268,8 @@ Agar dapat menerima notifikasi loker dan pengingat wawancara di ponsel Anda:
 * **Zero Telemetry & 100% Data Lokal:** File CV (`attachments/`), basis data riwayat (`data/`), dan konfigurasi disimpan lokal di komputer Anda. Direktori data sensitif dilindungi `.gitignore` sehingga tidak pernah terunggah ke internet.
 * **Database SQLite Bersegel HMAC-SHA256:** Integritas database dilindungi segel kriptografis HMAC (`data/security_seal.json`) dan backup snapshot terenkripsi. Jika terjadi manipulasi berkas database dari luar UI, sistem secara otomatis mendeteksi tanda bahaya (*tamper warning*) dan memulihkan snapshot sah terakhir.
 * **Proteksi CSRF & Origin Dinamis:** Seluruh aksi pengubah status diproteksi token CSRF ganda dan verifikasi Origin yang mendukung domain reverse proxy lokal (`.local`, `.test`, `.lan`, atau IP privat).
-* **Anti-Deteksi Peramban:** Menggunakan Playwright dengan flag stealth Chromium khusus dan isolasi sesi login (`user_browser_data/`) agar akun portal Anda tidak mudah terblokir.
+* **Anti-Deteksi & Optimasi Performa Ringan:** Menggunakan Playwright dengan flag stealth Chromium khusus, pencegahan lag CPU lewat akselerasi hardware GPU pada mode visual, pembatasan heap V8 (512MB), serta pemfilteran request jaringan (blokir tracker iklan dan aset media saat background scanning) agar laptop spek standar tetap dingin dan responsif.
+* **Isolasi Multi-Akun:** Mendukung isolasi sesi login browser (`user_browser_data/profiles/`) dan kuota pelamaran independen per akun.
 
 ---
 
@@ -309,7 +310,7 @@ job-hunter-copilot/
 │   └── js/app.js            # Logika antarmuka Web UI, filter, & integrasi API
 ├── templates/
 │   └── index.html           # Tampilan visual dashboard Web (Tab 1 - Tab 5)
-├── tests/                   # 21 berkas unit test lengkap (91 pengujian)
+├── tests/                   # 24 berkas unit test lengkap (113 pengujian)
 ├── start_windows.bat        # Skrip peluncur cepat 1-klik untuk Windows
 ├── start_linux.sh           # Skrip peluncur cepat 1-klik untuk Linux/macOS
 ├── web_app.py               # Server aplikasi Web Dashboard Flask
@@ -320,7 +321,7 @@ job-hunter-copilot/
 
 ## 🧪 Rangkaian Pengujian Otomatis
 
-Repositori ini dilengkapi rangkaian **91 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, background scheduler, hingga kepatuhan legal notice & unduh source code AGPLv3):
+Repositori ini dilengkapi rangkaian **113 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, background scheduler, hingga kepatuhan legal notice & unduh source code AGPLv3):
 
 ```bash
 python3 -m unittest discover tests -v

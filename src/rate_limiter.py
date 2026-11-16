@@ -61,12 +61,20 @@ class SafeRateLimiter:
         except Exception:
             pass
 
-    def check_quota(self, platform: str) -> tuple[bool, str, dict]:
+    def _storage_key(self, platform: str, account_id: str = None) -> str:
+        plat = platform.lower().strip()
+        if account_id and str(account_id).strip():
+            return f"{str(account_id).strip()}:{plat}"
+        return plat
+
+    def check_quota(self, platform: str, account_id: str = None) -> tuple[bool, str, dict]:
         """
         Memeriksa apakah platform masih dalam batas aman untuk melamar.
+        Mendukung isolasi kuota per-akun agar akun berbeda tidak saling membatasi.
         Returns: (is_allowed: bool, reason: str, stats: dict)
         """
         plat = platform.lower().strip()
+        storage_key = self._storage_key(plat, account_id)
         limit = self.limits.get(plat, {"max_per_hour": 15, "max_per_day": 40})
         now = time.time()
         one_hour_ago = now - 3600
@@ -74,11 +82,11 @@ class SafeRateLimiter:
 
         with _quota_lock:
             records = self._load_records()
-            plat_records = records.get(plat, [])
+            plat_records = records.get(storage_key, [])
 
             # Bersihkan record lebih lama dari 24 jam
             fresh_records = [ts for ts in plat_records if ts > one_day_ago]
-            records[plat] = fresh_records
+            records[storage_key] = fresh_records
             self._save_records(records)
 
             hour_count = sum(1 for ts in fresh_records if ts > one_hour_ago)
@@ -86,6 +94,7 @@ class SafeRateLimiter:
 
             stats = {
                 "platform": plat,
+                "account_id": account_id or "default",
                 "hour_count": hour_count,
                 "hour_limit": limit["max_per_hour"],
                 "day_count": day_count,
@@ -108,17 +117,18 @@ class SafeRateLimiter:
 
             return True, "Kuota aman.", stats
 
-    def record_application(self, platform: str):
+    def record_application(self, platform: str, account_id: str = None):
         plat = platform.lower().strip()
+        storage_key = self._storage_key(plat, account_id)
         now = time.time()
         with _quota_lock:
             records = self._load_records()
-            plat_records = records.get(plat, [])
+            plat_records = records.get(storage_key, [])
             plat_records.append(now)
-            records[plat] = plat_records
+            records[storage_key] = plat_records
             self._save_records(records)
 
-    def get_all_quotas(self) -> dict:
+    def get_all_quotas(self, account_id: str = None) -> dict:
         now = time.time()
         one_hour_ago = now - 3600
         one_day_ago = now - 86400
@@ -127,7 +137,8 @@ class SafeRateLimiter:
             records = self._load_records()
             summary = {}
             for plat, limit in self.limits.items():
-                plat_records = records.get(plat, [])
+                storage_key = self._storage_key(plat, account_id)
+                plat_records = records.get(storage_key, [])
                 fresh = [ts for ts in plat_records if ts > one_day_ago]
                 summary[plat] = {
                     "hour_count": sum(1 for ts in fresh if ts > one_hour_ago),

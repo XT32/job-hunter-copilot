@@ -58,6 +58,19 @@ class TestRateLimiter(unittest.TestCase):
         self.assertEqual(summary["jobstreet"]["hour_count"], 1)
         self.assertEqual(summary["jobstreet"]["day_count"], 1)
 
+    def test_quota_per_account_isolation(self):
+        # Akun A melebihi kuota harian Glints (2x)
+        self.limiter.record_application("glints", account_id="user_alpha")
+        self.limiter.record_application("glints", account_id="user_alpha")
+
+        allowed_a, _, _ = self.limiter.check_quota("glints", account_id="user_alpha")
+        self.assertFalse(allowed_a)
+
+        # Akun B harus tetap memiliki kuota penuh
+        allowed_b, _, stats_b = self.limiter.check_quota("glints", account_id="user_beta")
+        self.assertTrue(allowed_b)
+        self.assertEqual(stats_b["day_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

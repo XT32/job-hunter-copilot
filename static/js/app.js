@@ -1156,6 +1156,67 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       } catch (e) {}
     }
 
+    /* BACKGROUND AUTO-HUNT SCHEDULER */
+    function updateSchedulerUI(data) {
+      if (!data) return;
+      const btnStart = document.getElementById('btnStartScheduler');
+      const btnStop = document.getElementById('btnStopScheduler');
+      const countEl = document.getElementById('schedulerFoundCount');
+      const intervalSelect = document.getElementById('schedulerIntervalSelect');
+
+      if (data.active) {
+        if (btnStart) btnStart.style.display = 'none';
+        if (btnStop) btnStop.style.display = 'inline-block';
+      } else {
+        if (btnStart) btnStart.style.display = 'inline-block';
+        if (btnStop) btnStop.style.display = 'none';
+      }
+
+      if (countEl && typeof data.total_discovered !== 'undefined') {
+        countEl.textContent = data.total_discovered;
+      }
+      if (intervalSelect && data.interval_minutes) {
+        intervalSelect.value = String(data.interval_minutes);
+      }
+    }
+
+    async function toggleScheduler(start) {
+      const intervalSelect = document.getElementById('schedulerIntervalSelect');
+      const interval = intervalSelect ? parseInt(intervalSelect.value, 10) : 120;
+      const btnStart = document.getElementById('btnStartScheduler');
+      const btnStop = document.getElementById('btnStopScheduler');
+
+      if (btnStart) btnStart.disabled = true;
+      if (btnStop) btnStop.disabled = true;
+
+      try {
+        const res = await fetch('/api/scheduler', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: start ? 'start' : 'stop',
+            interval: interval
+          })
+        });
+        const data = await res.json();
+        updateSchedulerUI(data);
+        fetchLogs();
+      } catch (e) {
+        alert('Gagal mengatur jadwal pencarian otomatis: ' + e.message);
+      } finally {
+        if (btnStart) btnStart.disabled = false;
+        if (btnStop) btnStop.disabled = false;
+      }
+    }
+
+    async function loadSchedulerStatus() {
+      try {
+        const res = await fetch('/api/scheduler');
+        const data = await res.json();
+        updateSchedulerUI(data);
+      } catch (e) {}
+    }
+
     /* MODAL STATUS KONEKSI & BANTUAN */
     function openDiagnosticModal() {
       document.getElementById('diagnosticModal').classList.add('active');
@@ -1862,6 +1923,8 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
           await loadCVList();
           await loadKanban();
           await refreshBrowserStatus();
+          await loadRateLimits();
+          await loadSchedulerStatus();
           alert(`Berhasil beralih ke: ${data.account ? data.account.name : 'Akun Terpilih'}`);
         } else {
           alert('Gagal beralih akun: ' + (data.error || 'Terjadi kendala'));
@@ -1923,6 +1986,8 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
           await loadCVList();
           await loadKanban();
           await refreshBrowserStatus();
+          await loadRateLimits();
+          await loadSchedulerStatus();
           alert(data.message || 'Akun baru berhasil dibuat dan diaktifkan!');
         } else {
           alert('Gagal membuat akun: ' + (data.error || 'Terjadi kendala'));
@@ -2003,6 +2068,7 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
     fetchLogs();
     refreshBrowserStatus();
     loadRateLimits();
+    loadSchedulerStatus();
     checkAppUpdate(false);
 
     // Cek update otomatis setiap 5 menit & saat kembali membuka tab
