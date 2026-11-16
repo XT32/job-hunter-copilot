@@ -87,22 +87,35 @@ def check_portal_connectivity(timeout: int = 5) -> dict:
 def check_system_health(config_loader=None, db_verifier=None) -> dict:
     portal_status = check_portal_connectivity()
 
-    # Cek direktori browser lokal
-    browser_ready = os.path.exists(USER_BROWSER_DIR)
-    cookie_file = os.path.join(USER_BROWSER_DIR, "Default", "Cookies")
-    has_cookies = os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 1024
-
-    # Cek CV
+    # Cek CV & Akun Aktif
     active_cv = ""
     has_cv = False
+    active_account_id = "default"
+    active_account_name = "Akun Utama"
     if config_loader:
         try:
             cfg = config_loader()
             active_cv = cfg.get("active_cv", "")
+            active_account_id = cfg.get("active_account_id", "default")
+            for acc in cfg.get("accounts", []):
+                if acc.get("id") == active_account_id:
+                    active_account_name = acc.get("name", "Akun Utama")
+                    break
             cv_path = os.path.join(ROOT_DIR, "attachments", active_cv) if active_cv else ""
             has_cv = bool(cv_path and os.path.exists(cv_path) and os.path.getsize(cv_path) > 100)
         except Exception:
             pass
+
+    # Cek direktori browser lokal per akun aktif
+    if active_account_id != "default":
+        acc_dir = os.path.join(USER_BROWSER_DIR, "profiles", active_account_id)
+        browser_ready = os.path.exists(acc_dir)
+        cookie_file = os.path.join(acc_dir, "Default", "Cookies")
+    else:
+        browser_ready = os.path.exists(USER_BROWSER_DIR)
+        cookie_file = os.path.join(USER_BROWSER_DIR, "Default", "Cookies")
+
+    has_cookies = os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 1024
 
     # Cek Database
     db_status = {}
@@ -123,6 +136,10 @@ def check_system_health(config_loader=None, db_verifier=None) -> dict:
         "active_cv": {
             "filename": active_cv,
             "ready": has_cv,
+        },
+        "active_account": {
+            "id": active_account_id,
+            "name": active_account_name,
         },
         "database": db_status,
         "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),

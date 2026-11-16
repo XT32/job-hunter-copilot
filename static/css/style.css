@@ -128,3 +128,27 @@
       border: 2px solid #0f172a;
       animation: pulseDot 1.8s infinite;
     }
+
+    /* ACCOUNT SWITCHER DROPDOWN */
+    .account-item-btn {
+      width: 100%;
+      text-align: left;
+      padding: 8px 14px;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.15s;
+    }
+    .account-item-btn:hover {
+      background: rgba(56, 189, 248, 0.12);
+    }
+    .account-item-btn.active {
+      background: rgba(56, 189, 248, 0.2);
+      font-weight: 700;
+      color: var(--primary);
+    }

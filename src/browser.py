@@ -73,10 +73,19 @@ def _detect_channel(playwright_instance):
     return None
 
 
-def _cleanup_stale_singleton_locks():
+def get_user_data_dir(account_id: str = "default") -> str:
+    """Mengembalikan direktori profil browser yang terisolasi per akun."""
+    if not account_id or account_id == "default":
+        return USER_DATA_DIR
+    account_dir = os.path.join(USER_DATA_DIR, "profiles", str(account_id))
+    os.makedirs(account_dir, exist_ok=True)
+    return account_dir
+
+
+def _cleanup_stale_singleton_locks(target_dir: str = USER_DATA_DIR):
     """Membersihkan lock file Chromium yang tertinggal jika browser sebelumnya tertutup paksa."""
     for lock_name in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
-        p = os.path.join(USER_DATA_DIR, lock_name)
+        p = os.path.join(target_dir, lock_name)
         if os.path.lexists(p):
             try:
                 os.unlink(p)
@@ -84,13 +93,15 @@ def _cleanup_stale_singleton_locks():
                 pass
 
 
-def get_browser_context(playwright_instance, headless=False, slow_mo=150):
-    os.makedirs(USER_DATA_DIR, exist_ok=True)
-    _cleanup_stale_singleton_locks()
+def get_browser_context(playwright_instance, headless=False, slow_mo=150, user_data_dir=None, account_id="default"):
+    if user_data_dir is None:
+        user_data_dir = get_user_data_dir(account_id)
+    os.makedirs(user_data_dir, exist_ok=True)
+    _cleanup_stale_singleton_locks(user_data_dir)
 
     channel = _detect_channel(playwright_instance)
     kwargs = {
-        "user_data_dir": USER_DATA_DIR,
+        "user_data_dir": user_data_dir,
         "headless": headless,
         "slow_mo": slow_mo,
         "args": BROWSER_ARGS,

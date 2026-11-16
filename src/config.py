@@ -19,6 +19,7 @@ import copy
 import json
 import os
 from src.local_db import LocalSecureDB, DEFAULT_DB_PATH, TamperDetectedError
+from src.accounts import ensure_accounts_initialized, sync_active_account_data
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
 
@@ -79,13 +80,15 @@ DEFAULT_CONFIG = {
 def _merge_defaults(data: dict) -> dict:
     merged = copy.deepcopy(DEFAULT_CONFIG)
     if not isinstance(data, dict):
-        return merged
+        return ensure_accounts_initialized(merged)
     for key, val in data.items():
-        if isinstance(val, dict) and isinstance(merged.get(key), dict):
+        if key == "accounts" and isinstance(val, list):
+            merged["accounts"] = copy.deepcopy(val)
+        elif isinstance(val, dict) and isinstance(merged.get(key), dict):
             merged[key].update(val)
         else:
             merged[key] = val
-    return merged
+    return ensure_accounts_initialized(merged)
 
 
 def _get_config_db(file_path=DEFAULT_CONFIG_PATH) -> LocalSecureDB:
@@ -123,4 +126,5 @@ def load_config(file_path=DEFAULT_CONFIG_PATH):
 def save_config(cfg, file_path=DEFAULT_CONFIG_PATH, source="ui"):
     db = _get_config_db(file_path)
     merged = _merge_defaults(cfg)
+    merged = sync_active_account_data(merged)
     db.save_config(merged, key_name="main_config", source=source)
