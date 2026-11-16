@@ -29,8 +29,12 @@ PUNGUTAN_BIAYA_PATTERNS = [
     r"biaya\s+tes\s+kesehatan",
     r"biaya\s+psikotes",
     r"travel\s+agent\s+resmi\s+yang\s+ditunjuk",
+    r"agen\s+perjalanan\s+yang\s+ditunjuk",
     r"uang\s+pengganti\s+tiket",
-    r"reimbursement\s+tiket\s+pesawat"
+    r"reimbursement\s+tiket\s+pesawat",
+    r"biaya\s+akomodasi\s+akan\s+diganti",
+    r"biaya\s+tiket\s+ditalangi\s+dahulu",
+    r"biaya\s+transportasi\s+dan\s+penginapan\s+ditanggung\s+peserta"
 ]
 
 # 3. Pialang Berjangka / Futures / Trading / Forex Bodong

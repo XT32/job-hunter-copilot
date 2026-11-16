@@ -12,6 +12,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 import zipfile
 
 PORTAL_URLS = {
@@ -45,6 +46,18 @@ def check_portal_connectivity(timeout: int = 5) -> dict:
                     "latency_ms": latency_ms,
                     "url": url,
                 }
+        except urllib.error.HTTPError as e:
+            latency_ms = int((time.time() - start) * 1000)
+            results[name] = {
+                "reachable": e.code in (200, 301, 302, 403),
+                "status_code": e.code,
+                "latency_ms": latency_ms,
+                "url": url,
+            }
+            try:
+                e.close()
+            except Exception:
+                pass
         except Exception as e:
             results[name] = {
                 "reachable": False,

@@ -1,5 +1,17 @@
 import re
 
+
+def _contains_pattern(pattern: str, text: str) -> bool:
+    if not pattern or not text:
+        return False
+    pat = pattern.strip().lower()
+    txt = text.lower()
+    # Jika pola pendek (<= 4 karakter) atau satu kata, gunakan batas kata (word boundary)
+    if len(pat) <= 4 or " " not in pat:
+        return bool(re.search(rf"\b{re.escape(pat)}\b", txt))
+    return pat in txt
+
+
 class JobMatcher:
     def __init__(self, profile):
         """
@@ -27,27 +39,27 @@ class JobMatcher:
 
         # 1. Cek Blacklist (Kata Kunci Terlarang)
         for bad_word in self.blacklist:
-            if bad_word and (bad_word in title_lower or bad_word in combined_text):
+            if bad_word and (_contains_pattern(bad_word, title_lower) or _contains_pattern(bad_word, combined_text)):
                 return False, f"Mengandung kata blacklist: '{bad_word}'"
 
         # 2. Cek Kesesuaian Level Pengalaman (Jika Fresh Graduate / Junior)
         if self.experience_level in ["fresh_graduate", "junior"]:
-            senior_triggers = ["senior", "lead", "head of", "manager", "principal", "direktur", "vp "]
+            senior_triggers = ["senior", "lead", "head of", "manager", "principal", "direktur", "vp"]
             for trigger in senior_triggers:
-                # Cek di judul pekerjaan
-                if trigger in title_lower:
+                # Cek di judul pekerjaan dengan batas kata
+                if _contains_pattern(trigger, title_lower):
                     return False, f"Level terlalu tinggi untuk {self.experience_level} ('{trigger}' di judul)"
 
         # 3. Cek Kesesuaian Kata Kunci Utama (Jika ada target keywords)
         if self.target_keywords:
-            matched = any(kw in title_lower or kw in combined_text for kw in self.target_keywords)
+            matched = any(_contains_pattern(kw, title_lower) or _contains_pattern(kw, combined_text) for kw in self.target_keywords)
             if not matched:
                 return False, "Tidak cocok dengan target kata kunci jurusan/posisi"
 
         # 4. Cek Lokasi / Tipe Kerja jika dikonfigurasi
         if self.preferred_locations:
             loc_combined = f"{location.lower()} {title_lower} {desc_lower}"
-            loc_matched = any(pref in loc_combined for pref in self.preferred_locations)
+            loc_matched = any(_contains_pattern(pref, loc_combined) for pref in self.preferred_locations)
             if not loc_matched:
                 return False, f"Lokasi tidak sesuai preferensi ({', '.join(self.preferred_locations)})"
 

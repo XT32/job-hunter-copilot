@@ -78,5 +78,16 @@ class TestScamDetector(unittest.TestCase):
         self.assertEqual(res["risk_level"], "danger")
         self.assertTrue(any("Deposit" in f for f in res["flags"]))
 
+    def test_detect_fake_travel_reimbursement_scam(self):
+        res = check_for_red_flags(
+            title="Staff Administrasi BUMN",
+            company="Rekrutmen Nasional",
+            description="Peserta wajib memesan akomodasi lewat agen perjalanan yang ditunjuk, biaya akomodasi akan diganti saat tes.",
+            location="Surabaya"
+        )
+        self.assertTrue(res["is_red_flag"])
+        self.assertEqual(res["risk_level"], "danger")
+        self.assertTrue(any("Permintaan Uang" in f for f in res["flags"]))
+
 if __name__ == "__main__":
     unittest.main()

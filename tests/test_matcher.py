@@ -47,5 +47,15 @@ class TestJobMatcher(unittest.TestCase):
         self.assertFalse(is_match)
         self.assertIn("lokasi tidak sesuai", reason.lower())
 
+    def test_short_keyword_word_boundary(self):
+        it_matcher = JobMatcher({"target_keywords": ["IT"], "experience_level": "all"})
+        # "Quality" mengandung substring "it", tapi bukan kata "IT"
+        is_match_qa, _ = it_matcher.evaluate("Quality Assurance", "PT Indo")
+        self.assertFalse(is_match_qa)
+
+        # "IT Support" mengandung kata utuh "IT"
+        is_match_it, _ = it_matcher.evaluate("IT Support Specialist", "PT Indo")
+        self.assertTrue(is_match_it)
+
 if __name__ == "__main__":
     unittest.main()
