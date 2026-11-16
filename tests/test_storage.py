@@ -68,5 +68,19 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(stats["platforms"]["jobstreet"], 1)
         self.assertEqual(stats["platforms"]["dealls"], 1)
 
+    def test_update_notes_and_delete_job(self):
+        url = "https://glints.com/id/opportunities/jobs/notes-test"
+        storage.record_job(url, "UI Designer", "PT Kreatif", status="applied", notes="Awal")
+
+        self.assertTrue(storage.update_job_notes(url, "Catatan baru: interview via Zoom"))
+        hist = storage.load_history()
+        self.assertEqual(hist["applied"][0]["notes"], "Catatan baru: interview via Zoom")
+
+        # Delete job
+        self.assertTrue(storage.delete_job(url))
+        self.assertFalse(storage.is_job_recorded(url))
+        hist_after = storage.load_history()
+        self.assertEqual(len(hist_after["applied"]), 0)
+
 if __name__ == "__main__":
     unittest.main()

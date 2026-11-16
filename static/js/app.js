@@ -226,6 +226,8 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
         document.getElementById('cfgCustomQA').value = formatCustomQAText(scr.custom_qa);
         document.getElementById('cfgConfirmSubmit').checked = !!scr.confirm_before_submit;
         document.getElementById('cfgAutoSkip').checked = currentConfig.auto_skip_already_seen !== false;
+        const headlessEl = document.getElementById('cfgBrowserHeadless');
+        if (headlessEl) headlessEl.checked = !!currentConfig.browser_headless;
 
         document.getElementById('cfgTgToken').value = tg.bot_token || '';
         document.getElementById('cfgTgChat').value = tg.chat_id || '';
@@ -325,7 +327,8 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
             profile: prof,
             screening_defaults: scr,
             telegram: tg,
-            auto_skip_already_seen: document.getElementById('cfgAutoSkip').checked
+            auto_skip_already_seen: document.getElementById('cfgAutoSkip').checked,
+            browser_headless: document.getElementById('cfgBrowserHeadless') ? document.getElementById('cfgBrowserHeadless').checked : false
           })
         });
         const data = await res.json();
@@ -627,11 +630,64 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       }
     }
 
+    let currentJobFilter = 'all';
+    let currentJobSearch = '';
+
+    function setJobFilter(type) {
+      currentJobFilter = type;
+      const btnAll = document.getElementById('btnFilterAll');
+      const btnHigh = document.getElementById('btnFilterHighAts');
+      const btnSafe = document.getElementById('btnFilterSafe');
+      if (btnAll) btnAll.className = type === 'all' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+      if (btnHigh) btnHigh.className = type === 'high_ats' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+      if (btnSafe) btnSafe.className = type === 'safe_only' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+      renderJobs();
+    }
+
+    function filterFoundJobs() {
+      const input = document.getElementById('jobFilterSearch');
+      currentJobSearch = input ? input.value.trim().toLowerCase() : '';
+      renderJobs();
+    }
+
     function renderJobs() {
       const container = document.getElementById('jobsContainer');
+      const filterBar = document.getElementById('foundJobsFilterBar');
       container.innerHTML = '';
 
-      foundJobs.forEach((job, index) => {
+      if (!foundJobs || foundJobs.length === 0) {
+        if (filterBar) filterBar.style.display = 'none';
+        return;
+      }
+      if (filterBar) filterBar.style.display = 'flex';
+
+      const filtered = foundJobs.filter(job => {
+        if (currentJobFilter === 'high_ats') {
+          const score = (job.ats && job.ats.score) ? job.ats.score : 0;
+          if (score < 70) return false;
+        } else if (currentJobFilter === 'safe_only') {
+          if (job.red_flag && job.red_flag.is_red_flag) return false;
+        }
+
+        if (currentJobSearch) {
+          const t = (job.title || '').toLowerCase();
+          const c = (job.company || '').toLowerCase();
+          const s = (job.salary || '').toLowerCase();
+          const l = (job.location || '').toLowerCase();
+          if (!t.includes(currentJobSearch) && !c.includes(currentJobSearch) && !s.includes(currentJobSearch) && !l.includes(currentJobSearch)) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.9rem;">Tidak ada lowongan yang cocok dengan filter saat ini.</div>';
+        return;
+      }
+
+      filtered.forEach((job) => {
+        const index = foundJobs.indexOf(job);
         const card = document.createElement('div');
         card.className = 'job-card';
         card.id = `job-${index}`;
@@ -794,6 +850,16 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
     }
 
     /* KANBAN BOARD & ANALYTICS */
+    let kanbanHistory = {};
+    let kanbanSearchQuery = '';
+    let activeEditNotesUrl = '';
+
+    function filterKanbanCards() {
+      const input = document.getElementById('kanbanSearchInput');
+      kanbanSearchQuery = input ? input.value.trim().toLowerCase() : '';
+      renderKanbanBoard();
+    }
+
     async function loadAnalytics() {
       try {
         const res = await fetch('/api/analytics');
@@ -810,60 +876,152 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       try {
         const res = await fetch('/api/history');
         const hist = await res.json();
+        kanbanHistory = hist;
+        renderKanbanBoard();
+      } catch (e) {
+        console.error('Gagal memuat kanban:', e);
+      }
+    }
 
-        const statuses = ['applied', 'interview', 'offering', 'rejected'];
-        statuses.forEach(st => {
-          const items = hist[st] || [];
-          const cap = st.charAt(0).toUpperCase() + st.slice(1);
-          const countEl = document.getElementById(`count${cap}`);
-          if (countEl) countEl.innerText = items.length;
+    function renderKanbanBoard() {
+      const statuses = ['applied', 'interview', 'offering', 'rejected'];
+      let totalFound = 0;
+      let totalAll = 0;
 
-          const col = document.getElementById(`col${cap}`);
-          col.innerHTML = '';
-          items.slice(-25).reverse().forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'kanban-card';
+      statuses.forEach(st => {
+        const items = kanbanHistory[st] || [];
+        totalAll += items.length;
+        const cap = st.charAt(0).toUpperCase() + st.slice(1);
+        const col = document.getElementById(`col${cap}`);
+        if (!col) return;
+        col.innerHTML = '';
 
-            const encUrl = encodeURIComponent(item.url || '');
-            const encTitle = encodeURIComponent(item.title || '');
-            const encCompany = encodeURIComponent(item.company || '');
-            const encNotes = encodeURIComponent(item.notes || '');
+        const filtered = items.filter(item => {
+          if (!kanbanSearchQuery) return true;
+          const t = (item.title || '').toLowerCase();
+          const c = (item.company || '').toLowerCase();
+          const n = (item.notes || '').toLowerCase();
+          return t.includes(kanbanSearchQuery) || c.includes(kanbanSearchQuery) || n.includes(kanbanSearchQuery);
+        });
 
-            let interviewBadge = '';
-            let schedBtn = '';
-            if (st === 'interview') {
-              const dtMatch = (item.notes || '').match(/\[Jadwal:\s*([^\]]+)\]/);
-              const locMatch = (item.notes || '').match(/\[Lokasi:\s*([^\]]+)\]/);
-              if (dtMatch) {
-                interviewBadge = `<div style="font-size:0.75rem; color:var(--primary); margin-top:4px; font-weight:600;">📅 ${escapeHtml(dtMatch[1])}${locMatch ? ` (${escapeHtml(locMatch[1])})` : ''}</div>`;
-              }
-              schedBtn = `
-                <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
-                  <button class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:3px 8px;" onclick="openScheduleModal('${encUrl}', '${encTitle}', '${encCompany}', '${encNotes}')">📅 Jadwalkan</button>
-                  <a href="/api/job/export-ics?url=${encUrl}" class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:3px 8px;" title="Unduh file kalender .ics">📥 .ics</a>
-                </div>
-              `;
+        totalFound += filtered.length;
+
+        const countEl = document.getElementById(`count${cap}`);
+        if (countEl) {
+          countEl.innerText = kanbanSearchQuery ? `${filtered.length}/${items.length}` : items.length;
+        }
+
+        filtered.slice().reverse().forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'kanban-card';
+
+          const encUrl = encodeURIComponent(item.url || '');
+          const encTitle = encodeURIComponent(item.title || '');
+          const encCompany = encodeURIComponent(item.company || '');
+          const encNotes = encodeURIComponent(item.notes || '');
+
+          let interviewBadge = '';
+          let schedBtn = '';
+          if (st === 'interview') {
+            const dtMatch = (item.notes || '').match(/\[Jadwal:\s*([^\]]+)\]/);
+            const locMatch = (item.notes || '').match(/\[Lokasi:\s*([^\]]+)\]/);
+            if (dtMatch) {
+              interviewBadge = `<div style="font-size:0.75rem; color:var(--primary); margin-top:4px; font-weight:600;">📅 ${escapeHtml(dtMatch[1])}${locMatch ? ` (${escapeHtml(locMatch[1])})` : ''}</div>`;
             }
+            schedBtn = `
+              <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:3px 8px;" onclick="openScheduleModal('${encUrl}', '${encTitle}', '${encCompany}', '${encNotes}')">📅 Jadwalkan</button>
+                <a href="/api/job/export-ics?url=${encUrl}" class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:3px 8px;" title="Unduh file kalender .ics">📥 .ics</a>
+              </div>
+            `;
+          }
 
-            card.innerHTML = `
-              <div class="kanban-card-title">${escapeHtml(item.title || 'Posisi')}</div>
-              <div class="kanban-card-company">${escapeHtml(item.company || 'Perusahaan')}</div>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(item.timestamp || '')}</div>
-              ${interviewBadge}
-              ${item.notes ? `<div style="font-size: 0.75rem; color: var(--warning); margin-top: 4px;">📌 ${escapeHtml(item.notes)}</div>` : ''}
-              ${schedBtn}
-              <select class="kanban-card-select" onchange="moveKanban('${encUrl}', this.value, '${encTitle}', '${encCompany}', '${encNotes}')">
+          card.innerHTML = `
+            <div class="kanban-card-title">${escapeHtml(item.title || 'Posisi')}</div>
+            <div class="kanban-card-company">${escapeHtml(item.company || 'Perusahaan')}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(item.timestamp || '')}</div>
+            ${interviewBadge}
+            ${item.notes ? `<div style="font-size: 0.75rem; color: var(--warning); margin-top: 4px;">📌 ${escapeHtml(item.notes)}</div>` : ''}
+            ${schedBtn}
+            <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">
+              <select class="kanban-card-select" style="flex: 1;" onchange="moveKanban('${encUrl}', this.value, '${encTitle}', '${encCompany}', '${encNotes}')">
                 <option value="applied" ${st === 'applied' ? 'selected' : ''}>Terkirim</option>
                 <option value="interview" ${st === 'interview' ? 'selected' : ''}>Interview</option>
                 <option value="offering" ${st === 'offering' ? 'selected' : ''}>Offering</option>
                 <option value="rejected" ${st === 'rejected' ? 'selected' : ''}>Ditolak</option>
               </select>
-            `;
-            col.appendChild(card);
-          });
+              <button class="btn btn-secondary btn-sm" style="padding: 3px 7px; font-size: 0.75rem;" title="Edit Catatan" onclick="openEditNotesModal('${encUrl}', '${encTitle}', '${encCompany}', '${encNotes}')">✏️</button>
+              <button class="btn btn-danger btn-sm" style="padding: 3px 7px; font-size: 0.75rem;" title="Hapus dari Riwayat" onclick="deleteKanbanJob('${encUrl}', '${encTitle}')">🗑️</button>
+            </div>
+          `;
+          col.appendChild(card);
         });
+      });
+
+      const badge = document.getElementById('kanbanFilterCount');
+      if (badge) {
+        badge.innerText = kanbanSearchQuery ? `Menemukan ${totalFound} dari ${totalAll} lamaran` : `Total ${totalAll} lamaran`;
+      }
+    }
+
+    function openEditNotesModal(encUrl, encTitle, encCompany, encNotes) {
+      activeEditNotesUrl = decodeURIComponent(encUrl);
+      const title = decodeURIComponent(encTitle);
+      const company = decodeURIComponent(encCompany);
+      const notes = decodeURIComponent(encNotes);
+      document.getElementById('editNotesModalJobTitle').innerText = `${title} — ${company}`;
+      document.getElementById('editNotesModalText').value = notes || '';
+      document.getElementById('editNotesModal').classList.add('active');
+    }
+
+    function closeEditNotesModal() {
+      document.getElementById('editNotesModal').classList.remove('active');
+      activeEditNotesUrl = '';
+    }
+
+    async function saveJobNotesFromModal() {
+      if (!activeEditNotesUrl) return;
+      const newNotes = document.getElementById('editNotesModalText').value.trim();
+      try {
+        const res = await fetch('/api/job/update-notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: activeEditNotesUrl, notes: newNotes })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeEditNotesModal();
+          loadKanban();
+          fetchLogs();
+        } else {
+          alert('Gagal menyimpan catatan: ' + (data.error || 'Terjadi kesalahan'));
+        }
       } catch (e) {
-        console.error('Gagal memuat kanban:', e);
+        alert('Terjadi kendala saat menyimpan catatan.');
+      }
+    }
+
+    async function deleteKanbanJob(encUrl, encTitle) {
+      const url = decodeURIComponent(encUrl);
+      const title = decodeURIComponent(encTitle);
+      if (!confirm(`Hapus lowongan '${title}' dari papan riwayat?`)) return;
+
+      try {
+        const res = await fetch('/api/job/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadKanban();
+          loadAnalytics();
+          fetchLogs();
+        } else {
+          alert('Gagal menghapus lamaran: ' + (data.error || 'Terjadi kesalahan'));
+        }
+      } catch (e) {
+        alert('Terjadi kendala saat menghapus lamaran.');
       }
     }
 

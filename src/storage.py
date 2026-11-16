@@ -74,6 +74,16 @@ def update_job_status(job_url, new_status, notes=None, source="ui") -> bool:
     return _get_db().update_job_status(job_url, new_status, notes=notes, source=source)
 
 
+def update_job_notes(job_url, notes="", source="ui") -> bool:
+    """Memperbarui catatan lamaran (misal: link Zoom, nomor kontak HR) tanpa mengubah status."""
+    return _get_db().update_job_notes(job_url, notes=notes, source=source)
+
+
+def delete_job(job_url, source="ui") -> bool:
+    """Menghapus lowongan kerja dari Kanban dan riwayat lokal."""
+    return _get_db().delete_job(job_url, source=source)
+
+
 def verify_database_integrity() -> dict:
     """Mengembalikan status keamanan & deteksi tamper database lokal."""
     db = _get_db()

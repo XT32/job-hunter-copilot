@@ -68,7 +68,9 @@ Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
 - 💬 **Panggilan Interview**
 - 🏆 **Offering / Diterima**
 - ❌ **Ditolak / Gugur**
-Lengkap dengan fitur **Ekspor CSV/Excel** dengan 1 klik.
+- 🔍 **Pencarian Real-Time:** Filter kartu lowongan berdasarkan posisi, perusahaan, atau catatan secara instan tanpa batasan kuota tampilan.
+- ✏️ **Edit Catatan & 🗑️ Hapus:** Perbarui info link interview/nomor HR atau hapus lamaran uji coba langsung dari papan Kanban.
+- 📥 **Ekspor CSV/Excel & Kalender (.ics):** Unduh jadwal interview langsung ke Google/Outlook/Apple Calendar atau ekspor CSV dengan 1 klik.
 
 ### 8. Kirim Lamaran Email (1-Click Gmail Draft / Mailto / SMTP)
 Untuk lowongan yang meminta kirim email langsung ke HRD:
@@ -92,6 +94,8 @@ Unduh seluruh konfigurasi dan riwayat lamaran dalam format JSON dengan tombol **
 - **Bebas Telemetri & API Pihak Ketiga:** Analisis kecocokan ATS, ekstraksi teks, dan penulisan cover letter dihitung secara lokal tanpa mengirim data pribadi ke server eksternal atau AI cloud berbayar.
 - **Konservasi Memori (Low RAM):** Menggunakan flag Chromium khusus (`--disable-gpu`, `--renderer-process-limit=2`, dll) agar tetap lancar di perangkat dengan RAM 4GB.
 - **Sesi Lokal Aman:** Sesi login disimpan di direktori lokal (`user_browser_data/`) dan otomatis diabaikan oleh Git, sehingga data kredensial tidak pernah keluar dari komputer pengguna.
+- **Dukungan Reverse Proxy & Local Domain:** Mendukung domain lokal (`.local`, `.test`, atau reverse proxy Nginx/Caddy seperti `https://xt32.local`) dengan proteksi Origin CSRF dinamis dan port binding via env `PORT`/`HOST`.
+- **Mode Senyap (Headless):** Opsi pemindaian lowongan di latar belakang tanpa membuka jendela peramban saat pengguna sedang sibuk.
 - **Human-in-the-loop:** Pengguna memegang kendali penuh atas keputusan melamar atau melewati setiap lowongan.
 
 ---

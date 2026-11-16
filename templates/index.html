@@ -167,6 +167,19 @@
 
       <div id="scanStatus" style="display: none; padding: 12px; background: #1e293b; border-radius: 8px; margin-bottom: 15px; font-size: 0.9rem; color: var(--primary);"></div>
 
+      <!-- QUICK FILTER HASIL TEMUAN LOWONGAN -->
+      <div id="foundJobsFilterBar" style="display:none; margin-bottom:15px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:10px 14px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">Filter:</span>
+          <button class="btn btn-primary btn-sm" id="btnFilterAll" onclick="setJobFilter('all')">Semua</button>
+          <button class="btn btn-secondary btn-sm" id="btnFilterHighAts" onclick="setJobFilter('high_ats')">🎯 ATS ≥ 70%</button>
+          <button class="btn btn-secondary btn-sm" id="btnFilterSafe" onclick="setJobFilter('safe_only')">🛡️ Aman Saja</button>
+        </div>
+        <div style="flex:1; max-width:280px; min-width:180px;">
+          <input type="text" id="jobFilterSearch" placeholder="🔍 Cari di hasil temuan..." oninput="filterFoundJobs()" style="margin-bottom:0; padding:6px 12px; font-size:0.8rem;">
+        </div>
+      </div>
+
       <div id="jobsContainer" class="job-list"></div>
     </div>
 
@@ -219,12 +232,19 @@
         </div>
       </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
         <div class="card-title" style="margin-bottom: 0;">Papan Pelacak Status Lamaran (Pipeline)</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           <a href="/api/job/export-ics" class="btn btn-secondary btn-sm" title="Ekspor seluruh jadwal wawancara ke Google Calendar/Outlook/Apple Calendar">📅 Unduh Jadwal (.ics)</a>
           <a href="/api/export" class="btn btn-secondary btn-sm">📥 Unduh Rekap (CSV/Excel)</a>
         </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 240px;">
+          <input type="text" id="kanbanSearchInput" placeholder="🔍 Cari posisi, perusahaan, atau kata kunci catatan..." oninput="filterKanbanCards()" style="margin-bottom: 0; padding: 7px 12px; font-size: 0.85rem;">
+        </div>
+        <span id="kanbanFilterCount" class="badge" style="color: var(--text-muted); border-color: var(--border);">Menampilkan semua</span>
       </div>
 
       <div class="kanban-board">
@@ -417,6 +437,12 @@
             Otomatis lewati lowongan yang sudah pernah dilamar/dilihat
           </label>
         </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="cfgBrowserHeadless" style="width: auto;">
+            Mode Senyap (Headless — cari lowongan di latar belakang tanpa membuka jendela peramban)
+          </label>
+        </div>
       </div>
 
       <div class="card">
@@ -551,6 +577,22 @@
       <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="closeInterviewModal()">Batal</button>
         <button class="btn btn-success" onclick="saveInterviewSchedule()">💾 Simpan & Catat ke Interview</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT CATATAN KANBAN -->
+  <div class="modal-overlay" id="editNotesModal">
+    <div class="modal">
+      <div class="card-title">✏️ Edit Catatan Lamaran</div>
+      <div style="font-size:0.85rem; color:var(--primary); margin-bottom:12px;" id="editNotesModalJobTitle">Posisi - Perusahaan</div>
+      <div class="form-group">
+        <label>Catatan Perkembangan (Info Kontak HR, Link Test, Hasil Wawancara)</label>
+        <textarea id="editNotesModalText" rows="4" placeholder="Tuliskan catatan lamaran di sini..."></textarea>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="closeEditNotesModal()">Batal</button>
+        <button class="btn btn-primary" onclick="saveJobNotesFromModal()">💾 Simpan Catatan</button>
       </div>
     </div>
   </div>

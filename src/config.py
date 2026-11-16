@@ -54,6 +54,7 @@ DEFAULT_CONFIG = {
     "min_delay_sec": 2,
     "max_delay_sec": 4,
     "auto_skip_already_seen": True,
+    "browser_headless": False,
     "slow_mo_ms": 150,
 }
 

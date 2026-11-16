@@ -19,6 +19,8 @@ from src.storage import (
     load_history,
     record_job,
     update_job_status,
+    update_job_notes,
+    delete_job,
     export_history_to_csv,
     get_analytics_summary,
     verify_database_integrity,
@@ -50,7 +52,8 @@ SERVER_CSRF_TOKEN = secrets.token_hex(24)
 def csrf_and_origin_protect():
     """
     Melindungi dashboard UI-first dari serangan Cross-Site Request Forgery (CSRF)
-    dan eksekusi permintaan lintas domain berbahaya.
+    dan eksekusi permintaan lintas domain berbahaya, sambil tetap mendukung
+    reverse proxy lokal (.local, .test, .lan, atau domain lokal kustom).
     """
     if request.method in ("POST", "PUT", "DELETE", "PATCH"):
         # 1. Periksa header Origin / Referer jika ada
@@ -58,8 +61,22 @@ def csrf_and_origin_protect():
         if origin:
             try:
                 parsed = urlparse(origin)
-                allowed_hosts = ("127.0.0.1", "localhost", "0.0.0.0")
-                if parsed.hostname not in allowed_hosts:
+                current_host = (request.host or "").split(":")[0].lower()
+                origin_host = (parsed.hostname or "").lower()
+                allowed_hosts = {"127.0.0.1", "localhost", "0.0.0.0"}
+                if current_host:
+                    allowed_hosts.add(current_host)
+
+                is_allowed = (
+                    origin_host in allowed_hosts
+                    or origin_host.endswith(".local")
+                    or origin_host.endswith(".test")
+                    or origin_host.endswith(".lan")
+                    or origin_host.startswith("192.168.")
+                    or origin_host.startswith("10.")
+                    or (origin_host.startswith("172.") and any(origin_host.startswith(f"172.{i}.") for i in range(16, 32)))
+                )
+                if not is_allowed:
                     return jsonify({"success": False, "error": "Akses ditolak: Permintaan lintas domain dilarang."}), 403
             except Exception:
                 return jsonify({"success": False, "error": "Origin header tidak valid."}), 403
@@ -392,7 +409,7 @@ def update_config():
     data = request.json or {}
     cfg = load_config()
 
-    for key in ["profile", "screening_defaults", "smtp", "telegram", "active_cv", "min_delay_sec", "max_delay_sec", "auto_skip_already_seen"]:
+    for key in ["profile", "screening_defaults", "smtp", "telegram", "active_cv", "min_delay_sec", "max_delay_sec", "auto_skip_already_seen", "browser_headless"]:
         if key in data:
             if isinstance(data[key], dict) and isinstance(cfg.get(key), dict):
                 cfg[key].update(data[key])
@@ -608,11 +625,13 @@ def scan_jobs():
         if kw_list:
             scan_cfg["profile"]["target_keywords"] = kw_list
 
-    add_log(f"Menyiapkan browser untuk pemindaian di {platform_name}...", "info")
+    is_headless = bool(scan_cfg.get("browser_headless", False))
+    browser_mode_txt = "latar belakang (headless)" if is_headless else "jendela visual"
+    add_log(f"Menyiapkan browser [{browser_mode_txt}] untuk pemindaian di {platform_name}...", "info")
 
     with playwright_lock:
         with sync_playwright() as p:
-            context = get_browser_context(p, headless=False, slow_mo=scan_cfg.get("slow_mo_ms", 150))
+            context = get_browser_context(p, headless=is_headless, slow_mo=scan_cfg.get("slow_mo_ms", 150))
             page = context.new_page()
 
             try:
@@ -763,6 +782,35 @@ def update_status():
     success = update_job_status(job_url, new_status, notes, source="ui")
     if success:
         add_log(f"Status lamaran diperbarui ke '{new_status}'.", "info")
+    return jsonify({"success": success})
+
+
+@app.route("/api/job/update-notes", methods=["POST"])
+def api_update_job_notes():
+    data = request.json or {}
+    job_url = data.get("url")
+    notes = data.get("notes", "")
+
+    if not job_url:
+        return jsonify({"success": False, "error": "URL lowongan wajib disertakan"}), 400
+
+    success = update_job_notes(job_url, notes=notes, source="ui")
+    if success:
+        add_log("Catatan perkembangan lamaran diperbarui.", "info")
+    return jsonify({"success": success})
+
+
+@app.route("/api/job/delete", methods=["POST"])
+def api_delete_job():
+    data = request.json or {}
+    job_url = data.get("url")
+
+    if not job_url:
+        return jsonify({"success": False, "error": "URL lowongan wajib disertakan"}), 400
+
+    success = delete_job(job_url, source="ui")
+    if success:
+        add_log("Lamaran berhasil dihapus dari papan riwayat.", "info")
     return jsonify({"success": success})
 
 
@@ -1021,6 +1069,11 @@ def api_update_restart():
 
 
 def start_server(port=5000, auto_open=True):
+    port = int(os.environ.get("PORT", port))
+    host = os.environ.get("HOST", "127.0.0.1")
+    if os.environ.get("AUTO_OPEN", "").lower() in ("0", "false", "no"):
+        auto_open = False
+
     # Inisialisasi database lokal saat mulai
     try:
         sec = verify_database_integrity()
@@ -1036,11 +1089,11 @@ def start_server(port=5000, auto_open=True):
     if auto_open:
         def open_browser():
             time.sleep(1.2)
-            webbrowser.open(f"http://127.0.0.1:{port}")
+            webbrowser.open(f"http://{host if host != '0.0.0.0' else '127.0.0.1'}:{port}")
         threading.Thread(target=open_browser, daemon=True).start()
 
-    print(f"\n[OK] Job Hunter Copilot aktif di: http://127.0.0.1:{port}\n")
-    app.run(host="127.0.0.1", port=port, debug=False)
+    print(f"\n[OK] Job Hunter Copilot aktif di: http://{host}:{port}\n")
+    app.run(host=host, port=port, debug=False)
 
 
 if __name__ == "__main__":

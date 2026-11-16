@@ -94,6 +94,52 @@ class TestWebSecurityAndEndpoints(unittest.TestCase):
         self.assertFalse(data.get("success"))
         self.assertIn("wajib diisi", data.get("message"))
 
+    def test_post_with_local_domain_origin_is_allowed(self):
+        resp = self.client.post(
+            "/api/qa/save",
+            json={"keyword": "localtest", "answer": "ok"},
+            headers={
+                "X-CSRF-Token": SERVER_CSRF_TOKEN,
+                "Origin": "https://xt32.local",
+                "Host": "xt32.local",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # Cleanup
+        self.client.post(
+            "/api/qa/delete",
+            json={"keyword": "localtest"},
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+
+    def test_job_update_notes_and_delete_endpoints(self):
+        # 1. Record a manual job first
+        test_url = "https://id.jobstreet.com/job/test-endpoint-notes"
+        resp_rec = self.client.post(
+            "/api/record-manual",
+            json={"url": test_url, "title": "QA Engineer", "company": "PT Tech", "status": "applied", "notes": "Initial"},
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+        self.assertEqual(resp_rec.status_code, 200)
+
+        # 2. Update notes
+        resp_notes = self.client.post(
+            "/api/job/update-notes",
+            json={"url": test_url, "notes": "Interview via Google Meet jam 14:00"},
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+        self.assertEqual(resp_notes.status_code, 200)
+        self.assertTrue(resp_notes.get_json().get("success"))
+
+        # 3. Delete job
+        resp_del = self.client.post(
+            "/api/job/delete",
+            json={"url": test_url},
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+        self.assertEqual(resp_del.status_code, 200)
+        self.assertTrue(resp_del.get_json().get("success"))
 
 
 if __name__ == "__main__":

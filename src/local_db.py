@@ -593,6 +593,70 @@ class LocalSecureDB:
             self._write_seal_and_snapshot(key, conn)
             return True
 
+    def update_job_notes(self, job_url: str, notes: str, source: str = "ui") -> bool:
+        """Memperbarui catatan lamaran (misal: link interview, nama HR, hasil) tanpa mengubah status."""
+        with _db_lock:
+            self._assert_write_allowed(source)
+            key = self._get_or_create_key()
+            conn = self._connect()
+            existing = conn.execute(
+                "SELECT url, status, title, company, notes, timestamp, updated_at FROM job_history WHERE url=?",
+                (job_url,),
+            ).fetchone()
+            if not existing:
+                conn.close()
+                return False
+
+            now = time.strftime("%Y-%m-%d %H:%M:%S")
+            row = {
+                "url": existing["url"],
+                "status": existing["status"],
+                "title": existing["title"],
+                "company": existing["company"],
+                "notes": str(notes or ""),
+                "timestamp": existing["timestamp"],
+                "updated_at": now,
+            }
+            row_hmac = self._sign_job_row(key, row)
+            conn.execute(
+                """
+                UPDATE job_history
+                SET notes=?, updated_at=?, row_hmac=?
+                WHERE url=?
+                """,
+                (row["notes"], row["updated_at"], row_hmac, row["url"]),
+            )
+            conn.execute(
+                "INSERT INTO security_audit (event_time, event_type, detail) VALUES (?, 'UI_NOTES_UPDATE', ?)",
+                (now, f"Catatan '{row['title']}' diperbarui via {source}."),
+            )
+            self._write_seal_and_snapshot(key, conn)
+            return True
+
+    def delete_job(self, job_url: str, source: str = "ui") -> bool:
+        """Menghapus entri lamaran tertentu dari riwayat/Kanban."""
+        with _db_lock:
+            self._assert_write_allowed(source)
+            key = self._get_or_create_key()
+            conn = self._connect()
+            existing = conn.execute(
+                "SELECT title FROM job_history WHERE url=?",
+                (job_url,),
+            ).fetchone()
+            if not existing:
+                conn.close()
+                return False
+
+            title = existing["title"]
+            conn.execute("DELETE FROM job_history WHERE url=?", (job_url,))
+            now = time.strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute(
+                "INSERT INTO security_audit (event_time, event_type, detail) VALUES (?, 'UI_JOB_DELETE', ?)",
+                (now, f"Lamaran '{title}' dihapus via {source}."),
+            )
+            self._write_seal_and_snapshot(key, conn)
+            return True
+
     def _read_snapshot(self) -> dict:
         if not os.path.exists(self.snapshot_path):
             return None
