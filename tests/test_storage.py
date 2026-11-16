@@ -49,9 +49,12 @@ class TestStorage(unittest.TestCase):
         storage.export_history_to_csv(csv_path)
 
         self.assertTrue(os.path.exists(csv_path))
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, "r", encoding="utf-8-sig") as f:
             reader = list(csv.reader(f))
             self.assertEqual(len(reader), 3)
+            self.assertIn("Platform", reader[0])
+            self.assertEqual(reader[1][3], "JobStreet")
+            self.assertEqual(reader[2][3], "Glints")
 
     def test_analytics_summary(self):
         storage.record_job("https://glints.com/id/1", "Dev 1", "PT A", status="applied")

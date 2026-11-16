@@ -57,23 +57,42 @@ Thank you for considering my application. I look forward to the possibility of d
 
 Best regards,
 {applicant_name}
+{contact_info}""",
+
+    "english_internship": """Dear Internship Coordinator at {company},
+
+I am writing to express my strong interest in the {role} internship position at {company}.
+
+As a student/graduate majoring in {major}, I have gained solid foundational skills in {skills}. I am enthusiastic about applying my knowledge in a practical work environment, learning from industry professionals, and actively contributing to your team's initiatives.
+
+Thank you for your time and consideration. I would welcome the opportunity to discuss my qualifications further in an interview.
+
+Sincerely,
+{applicant_name}
 {contact_info}"""
 }
+
+
+class _SafeDict(dict):
+    def __missing__(self, key):
+        return f"[{key}]"
+
 
 def generate_cover_letter(role, company, profile=None, preset="formal") -> str:
     profile = profile or {}
     template = TEMPLATES.get(preset, TEMPLATES["formal"])
-    
+
     applicant_name = profile.get("applicant_name", "Pelamar")
     major = profile.get("field_or_major", "Pendidikan Terkait")
     skills = ", ".join(profile.get("target_keywords", ["Bidang Terkait"]))
     contact = profile.get("contact_info", "")
 
-    return template.format(
-        applicant_name=applicant_name,
-        company=company,
-        role=role,
-        major=major,
-        skills=skills,
-        contact_info=contact
-    )
+    mapping = {
+        "applicant_name": applicant_name,
+        "company": company,
+        "role": role,
+        "major": major,
+        "skills": skills,
+        "contact_info": contact,
+    }
+    return template.format_map(_SafeDict(mapping))

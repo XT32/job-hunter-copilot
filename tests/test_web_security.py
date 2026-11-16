@@ -178,6 +178,48 @@ class TestWebSecurityAndEndpoints(unittest.TestCase):
             headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
         )
 
+    def test_telegram_share_job_endpoint(self):
+        # 1. When telegram disabled in config
+        resp = self.client.post(
+            "/api/telegram/share-job",
+            json={
+                "title": "Software Engineer",
+                "company": "PT Tech",
+                "url": "https://glints.com/jobs/123",
+                "platform": "Glints",
+                "salary": "Rp 10.000.000",
+                "ats_score": 85
+            },
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertFalse(data.get("success"))
+        self.assertIn("belum aktif", data.get("message", ""))
+
+    def test_set_interview_endpoint(self):
+        resp = self.client.post(
+            "/api/job/set-interview",
+            json={
+                "url": "https://glints.com/jobs/interview-test",
+                "title": "Data Analyst",
+                "company": "PT Analitika",
+                "datetime": "2026-11-25T14:00",
+                "location": "Zoom Meet",
+                "notes": "Siapkan portofolio dashboard"
+            },
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json().get("success"))
+
+        # Cleanup
+        self.client.post(
+            "/api/job/delete",
+            json={"url": "https://glints.com/jobs/interview-test"},
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

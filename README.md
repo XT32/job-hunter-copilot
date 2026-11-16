@@ -38,6 +38,7 @@ Menganalisis teks lowongan secara heuristik lokal untuk melindungi pencari kerja
 - ⚠️ Deteksi **permintaan pungutan uang** (biaya formulir, uang seragam, tes kesehatan/psikotes berbayar, agen tiket travel).
 - ⚠️ Deteksi **penipuan kirim undangan via file APK WhatsApp** (`.apk`, *unduh surat panggilan.apk*).
 - ⚠️ Deteksi **modus tugas pesanan e-commerce / deposit saldo berbayar**.
+- ⚠️ Deteksi **modus pinjol / paylater / aktivasi rekening bank fiktif** berkedok syarat training atau kuota penempatan.
 - ⚠️ Deteksi **perusahaan pialang berjangka / futures / forex** terselubung.
 - ⚠️ Deteksi modus interview fiktif di titik rawan (ruko Senen, Harmoni, dll).
 
@@ -45,6 +46,7 @@ Menganalisis teks lowongan secara heuristik lokal untuk melindungi pencari kerja
 - Unggah dan kelola beberapa variasi CV (misal: versi IT, Administrasi, Desain).
 - Tetapkan salah satu sebagai **CV Aktif** dengan 1 klik.
 - Sistem mengekstrak keahlian dan mengalkulasi persentase kecocokan ATS (*Applicant Tracking System*) secara langsung pada setiap kartu lowongan yang ditemukan.
+- Mendukung pengenalan kata kunci teknis 2 huruf (*UI*, *UX*, *QA*, *AI*, *ML*, *Go*, *JS*, *TS*, *IT*, *HR*) serta simbol khusus (*C++*, *C#*, *.NET*).
 
 ### 4. Panduan Standar Gaji & Rekomendasi UMR 2024/2025 (`src/salary_guide.py`)
 - Dilengkapi database Upah Minimum Regional/Kota (UMR/UMK) resmi untuk kota-kota utama (DKI Jakarta, Surabaya, Bandung, Semarang, Karawang, Bekasi, Yogyakarta, Medan, dll).
@@ -60,7 +62,8 @@ Mendeteksi dan mengisi otomatis kuesioner umum saat pop-up lamaran muncul:
 ### 6. Generator Cover Letter Instan Bahasa Indonesia & Inggris (`src/cover_letter.py`)
 Menghasilkan surat lamaran kerja yang dipersonalisasi sesuai nama pelamar, nama perusahaan tujuan, dan posisi:
 - Pilihan gaya Bahasa Indonesia: **Formal Korporat**, **Fresh Graduate**, dan **Program Pemagangan**.
-- Pilihan gaya Bahasa Inggris: **Formal Corporate (English)** dan **Fresh Graduate / Entry Level (English)** untuk lowongan startup internasional & multinasional.
+- Pilihan gaya Bahasa Inggris: **Formal Corporate (English)**, **Fresh Graduate / Entry Level (English)**, dan **English Internship (Intern)**.
+- Dilengkapi tombol salin kilat dan **Unduh .txt** sekali klik.
 
 ### 7. Papan Pelacak Status Lamaran & Mini Analytics (Kanban Pipeline)
 Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
@@ -71,7 +74,8 @@ Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
 - 🔍 **Pencarian Real-Time:** Filter kartu lowongan berdasarkan posisi, perusahaan, atau catatan secara instan tanpa batasan kuota tampilan.
 - ✏️ **Edit Catatan & 🗑️ Hapus:** Perbarui info link interview/nomor HR atau hapus lamaran uji coba langsung dari papan Kanban.
 - 🧹 **Bersihkan Massal:** Tombol 1-klik untuk membersihkan seluruh riwayat lamaran yang ditolak agar papan Kanban tetap rapi.
-- 📥 **Ekspor CSV/Excel & Kalender (.ics):** Unduh jadwal interview langsung ke Google/Outlook/Apple Calendar atau ekspor CSV dengan 1 klik.
+- 📲 **Integrasi Bot Telegram & Pengingat Interview:** Kirim lowongan menarik dari kartu hasil temuan ke Telegram dengan 1 klik, serta terima notifikasi instan saat jadwal interview dicatat.
+- 📥 **Ekspor CSV Excel-Friendly (UTF-8 BOM) & Kalender (.ics):** Unduh jadwal interview ke Google/Outlook/Apple Calendar atau ekspor CSV dengan kolom platform lengkap.
 
 ### 8. Kirim Lamaran Email (1-Click Gmail Draft / Mailto / SMTP)
 Untuk lowongan yang meminta kirim email langsung ke HRD:

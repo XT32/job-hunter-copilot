@@ -91,6 +91,18 @@ DEPOSIT_TASK_PATTERNS = [
     r"menyelesaikan\s+misi\s+pesanan"
 ]
 
+# 8. Modus Registrasi Pinjol / Paylater / Buka Rekening Fiktif
+PINJOL_PAYLATER_PATTERNS = [
+    r"aktivasi\s+akun\s+paylater",
+    r"pendaftaran\s+pinjaman\s+online",
+    r"buka\s+rekening\s+bank\s+baru\s+untuk",
+    r"verifikasi\s+limit\s+kredit",
+    r"kuota\s+limit\s+pinjaman",
+    r"foto\s+selfie\s+memegang\s+ktp\s+dan\s+buku\s+tabungan",
+    r"wajib\s+memiliki\s+limit\s+akulaku",
+    r"wajib\s+memiliki\s+limit\s+kredivo"
+]
+
 def check_for_red_flags(title: str, company: str, description: str = "", location: str = "") -> dict:
     """
     Menganalisis teks lowongan kerja untuk mendeteksi potensi bahaya, klausul tahan ijazah, atau penipuan.
@@ -148,6 +160,12 @@ def check_for_red_flags(title: str, company: str, description: str = "", locatio
             flags.append("Modus Deposit Saldo / Misi Pesanan E-Commerce Berbayar")
             break
 
+    # Cek modus pinjol / paylater / buka rekening (Tingkat DANGER)
+    for p in PINJOL_PAYLATER_PATTERNS:
+        if re.search(p, full_text):
+            flags.append("Modus Registrasi Paylater / Pinjol / Buka Rekening Fiktif (Indikasi Penipuan Identitas)")
+            break
+
     is_red_flag = len(flags) > 0
     if not is_red_flag:
         return {
@@ -159,7 +177,7 @@ def check_for_red_flags(title: str, company: str, description: str = "", locatio
 
     # Tentukan risk level
     has_danger = any(
-        "Tahan Ijazah" in f or "Permintaan Uang" in f or "Iming-iming" in f or "APK" in f or "Deposit" in f
+        "Tahan Ijazah" in f or "Permintaan Uang" in f or "Iming-iming" in f or "APK" in f or "Deposit" in f or "Paylater" in f or "Pinjol" in f
         for f in flags
     )
     risk_level = "danger" if has_danger else "warning"

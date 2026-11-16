@@ -733,6 +733,7 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
             <button class="btn btn-success btn-sm" onclick="applyJob(${index})">✅ Lamar Otomatis</button>
             <button class="btn btn-primary btn-sm" onclick="openJobInCopilotBrowser(${index})">🌐 Buka di Browser Copilot</button>
             <button class="btn btn-purple btn-sm" onclick="openCoverLetterModal(${index})">📄 Cover Letter</button>
+            <button class="btn btn-secondary btn-sm" onclick="shareJobToTelegram(${index})" title="Kirim lowongan ini ke bot Telegram Anda">📲 Telegram</button>
             <button class="btn btn-secondary btn-sm" onclick="skipJob(${index})">⏭️ Lewati</button>
           </div>
         `;
@@ -1205,11 +1206,15 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
 
     /* INTERVIEW MODAL & SCHEDULER */
     let currentInterviewUrl = null;
+    let currentInterviewTitle = '';
+    let currentInterviewCompany = '';
     function openScheduleModal(encUrl, encTitle, encCompany, encNotes) {
       currentInterviewUrl = decodeURIComponent(encUrl);
       const title = decodeURIComponent(encTitle || '');
       const company = decodeURIComponent(encCompany || '');
       const notes = decodeURIComponent(encNotes || '');
+      currentInterviewTitle = title;
+      currentInterviewCompany = company;
 
       document.getElementById('interviewModalJobTitle').innerText = `${title} — ${company}`;
 
@@ -1251,6 +1256,8 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url: currentInterviewUrl,
+            title: currentInterviewTitle,
+            company: currentInterviewCompany,
             datetime: dt,
             location: loc,
             notes: notes
@@ -1368,18 +1375,75 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       alert('Surat lamaran berhasil disalin ke clipboard!');
     }
 
+    function downloadCoverLetterTxt() {
+      const txt = document.getElementById('clText').value;
+      if (!txt) {
+        alert('Teks surat lamaran kosong.');
+        return;
+      }
+      const role = activeCLJob ? (activeCLJob.title || '').replace(/[^a-zA-Z0-9_-]/g, '_') : 'surat_lamaran';
+      const company = activeCLJob ? (activeCLJob.company || '').replace(/[^a-zA-Z0-9_-]/g, '_') : 'perusahaan';
+      const filename = `Cover_Letter_${role}_${company}.txt`;
+
+      const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function shareJobToTelegram(index) {
+      const job = foundJobs[index];
+      if (!job) return;
+      const platformSelect = document.getElementById('platformSelect');
+      const platform = platformSelect ? platformSelect.options[platformSelect.selectedIndex].text : 'Web';
+      try {
+        const res = await fetch('/api/telegram/share-job', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: job.title,
+            company: job.company,
+            url: job.url,
+            platform: platform,
+            salary: job.salary,
+            ats_score: (job.ats && job.ats.score) ? job.ats.score : null
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ ' + data.message);
+        } else {
+          alert('⚠️ ' + data.message);
+        }
+      } catch (err) {
+        alert('Terjadi kendala jaringan saat menghubungi bot Telegram.');
+      }
+    }
+
     /* DIRECT COLD EMAIL (1-CLICK GMAIL / MAILTO / SMTP) */
     async function generateEmailDraft() {
       const role = document.getElementById('emailRole').value || 'Staff';
       const company = document.getElementById('emailCompany').value || 'Perusahaan';
       const name = document.getElementById('cfgName').value || 'Pelamar';
+      const presetSelect = document.getElementById('emailPreset');
+      const preset = presetSelect ? presetSelect.value : 'formal';
 
-      document.getElementById('emailSubject').value = `Lamaran Pekerjaan: ${role} - ${name}`;
+      if (preset.startsWith('english')) {
+        document.getElementById('emailSubject').value = `Job Application: ${role} - ${name}`;
+      } else {
+        document.getElementById('emailSubject').value = `Lamaran Pekerjaan: ${role} - ${name}`;
+      }
+
       try {
         const res = await fetch('/api/cover-letter', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: role, company: company, preset: 'formal' })
+          body: JSON.stringify({ role: role, company: company, preset: preset })
         });
         const data = await res.json();
         document.getElementById('emailBody').value = data.cover_letter;

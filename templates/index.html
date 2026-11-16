@@ -303,9 +303,22 @@
             <input type="text" id="emailCompany" placeholder="Contoh: PT Solusi Inovasi">
           </div>
         </div>
-        <div class="form-group">
-          <label>Posisi Pekerjaan yang Dilamar</label>
-          <input type="text" id="emailRole" placeholder="Contoh: Staff Akuntansi">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Posisi Pekerjaan yang Dilamar</label>
+            <input type="text" id="emailRole" placeholder="Contoh: Staff Akuntansi">
+          </div>
+          <div class="form-group">
+            <label>Gaya Template Surat</label>
+            <select id="emailPreset" onchange="generateEmailDraft()">
+              <option value="formal">Formal & Profesional (Standar - ID)</option>
+              <option value="fresh_grad">Fresh Graduate (Antusias - ID)</option>
+              <option value="magang">Program Magang (Kampus / MagangHub - ID)</option>
+              <option value="english_formal">English Corporate (Multinational - EN)</option>
+              <option value="english_fresh_grad">English Fresh Graduate (Startup - EN)</option>
+              <option value="english_internship">English Internship (Intern - EN)</option>
+            </select>
+          </div>
         </div>
         <div class="form-group">
           <label>Subjek Email</label>
@@ -529,14 +542,18 @@
           <option value="magang">Program Pemagangan (MagangHub / Kampus - ID)</option>
           <option value="english_formal">English Professional (Corporate & Multinational - EN)</option>
           <option value="english_fresh_grad">English Fresh Graduate (Tech & Startup - EN)</option>
+          <option value="english_internship">English Internship (Students & Trainees - EN)</option>
         </select>
       </div>
       <div class="form-group">
         <textarea id="clText" rows="12"></textarea>
       </div>
-      <div style="display: flex; justify-content: space-between;">
+      <div style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
         <button class="btn btn-secondary" onclick="closeModal()">Tutup</button>
-        <button class="btn btn-primary" onclick="copyCoverLetter()">📋 Salin Teks</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" onclick="downloadCoverLetterTxt()">📥 Unduh (.txt)</button>
+          <button class="btn btn-primary" onclick="copyCoverLetter()">📋 Salin Teks</button>
+        </div>
       </div>
     </div>
   </div>

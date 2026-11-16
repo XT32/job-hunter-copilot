@@ -57,5 +57,20 @@ class TestJobMatcher(unittest.TestCase):
         is_match_it, _ = it_matcher.evaluate("IT Support Specialist", "PT Indo")
         self.assertTrue(is_match_it)
 
+    def test_lead_generation_exception_for_junior(self):
+        marketing_matcher = JobMatcher({
+            "target_keywords": ["Lead Generation", "Marketing"],
+            "experience_level": "fresh_graduate"
+        })
+        # Lead Generation Officer tidak boleh diblokir oleh trigger 'lead'
+        is_match, reason = marketing_matcher.evaluate("Lead Generation Officer", "PT Startup")
+        self.assertTrue(is_match)
+        self.assertEqual(reason, "Sesuai profil")
+
+        # Tech Lead tetap harus diblokir untuk fresh graduate
+        is_match_tech, reason_tech = marketing_matcher.evaluate("Tech Lead Marketing", "PT Startup")
+        self.assertFalse(is_match_tech)
+        self.assertIn("level terlalu tinggi", reason_tech.lower())
+
 if __name__ == "__main__":
     unittest.main()

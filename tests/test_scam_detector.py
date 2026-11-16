@@ -89,5 +89,16 @@ class TestScamDetector(unittest.TestCase):
         self.assertEqual(res["risk_level"], "danger")
         self.assertTrue(any("Permintaan Uang" in f for f in res["flags"]))
 
+    def test_detect_pinjol_paylater_scam(self):
+        res = check_for_red_flags(
+            title="Customer Relationship Officer",
+            company="PT Mitra Keuangan",
+            description="Kandidat wajib aktivasi akun paylater dan verifikasi limit kredit untuk tes sistem.",
+            location="Jakarta Pusat"
+        )
+        self.assertTrue(res["is_red_flag"])
+        self.assertEqual(res["risk_level"], "danger")
+        self.assertTrue(any("Paylater" in f or "Pinjol" in f for f in res["flags"]))
+
 if __name__ == "__main__":
     unittest.main()

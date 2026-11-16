@@ -46,6 +46,9 @@ class JobMatcher:
         if self.experience_level in ["fresh_graduate", "junior"]:
             senior_triggers = ["senior", "lead", "head of", "manager", "principal", "direktur", "vp"]
             for trigger in senior_triggers:
+                # Pengecualian khusus: 'lead generation', 'lead generator', 'lead gen', 'community lead' dll yang bukan tech lead
+                if trigger == "lead" and any(exc in title_lower for exc in ["lead generation", "lead generator", "lead gen", "community lead"]):
+                    continue
                 # Cek di judul pekerjaan dengan batas kata
                 if _contains_pattern(trigger, title_lower):
                     return False, f"Level terlalu tinggi untuk {self.experience_level} ('{trigger}' di judul)"

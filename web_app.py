@@ -33,7 +33,12 @@ from src.local_db import get_default_db, TamperDetectedError
 from src.config import load_config, save_config, DEFAULT_CONFIG
 from src.cover_letter import generate_cover_letter
 from src.email_sender import send_cold_email
-from src.notifier import send_telegram_alert, test_telegram_connection
+from src.notifier import (
+    send_telegram_alert,
+    test_telegram_connection,
+    send_telegram_interview_alert,
+    send_telegram_job_alert,
+)
 from src.cv_analyzer import extract_text_from_pdf, calculate_ats_match
 from src.scheduler import AutoHuntScheduler
 from src.scam_detector import check_for_red_flags
@@ -440,6 +445,45 @@ def test_telegram_route():
     else:
         add_log(f"Tes notifikasi bot Telegram gagal: {result.get('message')}", "warning")
     return jsonify(result)
+
+
+@app.route("/api/telegram/share-job", methods=["POST"])
+def share_job_telegram():
+    data = request.json or {}
+    title = data.get("title", "Posisi")
+    company = data.get("company", "Perusahaan")
+    url = data.get("url", "")
+    platform = data.get("platform", "Web")
+    salary = data.get("salary", "Tidak dicantumkan")
+    ats_score = data.get("ats_score")
+
+    cfg = load_config()
+    tg_cfg = cfg.get("telegram", {})
+    bot_token = tg_cfg.get("bot_token", "")
+    chat_id = tg_cfg.get("chat_id", "")
+
+    if not tg_cfg.get("enabled", False) or not bot_token or not chat_id:
+        return jsonify({
+            "success": False,
+            "message": "Fitur bot Telegram belum aktif. Silakan isi Bot Token & Chat ID di menu Profil & Pengaturan."
+        })
+
+    success = send_telegram_job_alert(
+        title=title,
+        company=company,
+        url=url,
+        platform=platform,
+        salary=salary,
+        ats_score=ats_score,
+        bot_token=bot_token,
+        chat_id=chat_id,
+    )
+    if success:
+        add_log(f"Lowongan '{title}' di '{company}' berhasil dibagikan ke Telegram.", "success")
+        return jsonify({"success": True, "message": "Lowongan berhasil dikirim ke bot Telegram kamu!"})
+    else:
+        add_log(f"Gagal mengirim lowongan '{title}' ke Telegram. Periksa token/koneksi.", "warning")
+        return jsonify({"success": False, "message": "Gagal mengirim ke Telegram. Periksa token bot atau koneksi internet."})
 
 
 
@@ -1086,8 +1130,38 @@ def api_set_interview():
         return jsonify({"success": False, "error": "URL lowongan wajib diisi."}), 400
 
     success = set_interview_schedule(job_url, interview_datetime, location=location, notes=notes, source="ui")
+    if not success:
+        title = data.get("title") or "Pekerjaan"
+        company = data.get("company") or "Perusahaan"
+        full_notes_list = []
+        if interview_datetime:
+            full_notes_list.append(f"[Jadwal: {interview_datetime.strip()}]")
+        if location:
+            full_notes_list.append(f"[Lokasi: {location.strip()}]")
+        if notes:
+            full_notes_list.append(notes.strip())
+        record_job(job_url, title, company, status="interview", notes=" ".join(full_notes_list), source="ui")
+        success = True
+
     if success:
         add_log("Jadwal interview dicatat & status dipindahkan ke tahap Interview.", "success")
+        try:
+            cfg = load_config()
+            tg_cfg = cfg.get("telegram", {})
+            if tg_cfg.get("enabled", False) and tg_cfg.get("bot_token") and tg_cfg.get("chat_id"):
+                title = data.get("title") or "Pekerjaan"
+                company = data.get("company") or "Perusahaan"
+                send_telegram_interview_alert(
+                    title=title,
+                    company=company,
+                    datetime_str=interview_datetime,
+                    location=location,
+                    notes=notes,
+                    bot_token=tg_cfg.get("bot_token"),
+                    chat_id=tg_cfg.get("chat_id"),
+                )
+        except Exception:
+            pass
     return jsonify({"success": success})
 
 

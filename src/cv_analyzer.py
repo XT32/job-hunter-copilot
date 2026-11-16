@@ -10,6 +10,12 @@ STOPWORDS = {
 }
 
 
+TECH_SPECIAL_TOKENS = {"c++", "c#", ".net"}
+KNOWN_SHORT_KEYWORDS = {
+    "ui", "ux", "qa", "ai", "ml", "it", "hr", "go", "js", "ts", "db", "pr", "bi", "ci", "cd"
+}
+
+
 def extract_text_from_pdf(pdf_path: str) -> str:
     """Mengekstrak teks mentah dari file PDF CV pelamar"""
     if not pdf_path or not os.path.exists(pdf_path):
@@ -36,8 +42,29 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
 def get_keywords(text: str) -> set:
     """Mengekstrak kata kunci esensial (keahlian, teknologi, bidang) dari teks"""
-    words = re.findall(r'[a-zA-Z]{3,}', text.lower())
-    return {w for w in words if w not in STOPWORDS}
+    if not text:
+        return set()
+    txt = text.lower()
+    extracted = set()
+
+    # 1. Token khusus teknis (c++, c#, .net)
+    for tok in TECH_SPECIAL_TOKENS:
+        if re.search(rf"(?:^|[^\w#+]){re.escape(tok)}(?:[^\w#+]|$)", txt):
+            extracted.add(tok)
+
+    # 2. Kata-kata standar minimal 3 huruf
+    words = re.findall(r'[a-zA-Z]{3,}', txt)
+    for w in words:
+        if w not in STOPWORDS:
+            extracted.add(w)
+
+    # 3. Kata kunci singkatan teknis & peran 2 huruf yang diakui
+    short_words = re.findall(r'\b[a-zA-Z]{2}\b', txt)
+    for sw in short_words:
+        if sw in KNOWN_SHORT_KEYWORDS and sw not in STOPWORDS:
+            extracted.add(sw)
+
+    return extracted
 
 
 def calculate_ats_match(cv_text: str, job_title: str, job_description: str = "") -> dict:

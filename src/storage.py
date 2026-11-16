@@ -144,7 +144,7 @@ def acknowledge_legacy_hashes():
 
 
 def export_history_to_csv(export_path=DEFAULT_CSV_EXPORT) -> str:
-    """Mengekspor seluruh riwayat (semua status pipeline) ke format CSV"""
+    """Mengekspor seluruh riwayat (semua status pipeline) ke format CSV dengan UTF-8 BOM untuk kompatibilitas Excel"""
     hist = load_history()
     os.makedirs(os.path.dirname(export_path), exist_ok=True)
 
@@ -156,18 +156,35 @@ def export_history_to_csv(export_path=DEFAULT_CSV_EXPORT) -> str:
         "skipped": "Dilewati",
     }
 
-    with open(export_path, "w", encoding="utf-8", newline="") as f:
+    with open(export_path, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Status", "Posisi", "Perusahaan", "Waktu", "Tautan Loker", "Catatan"])
+        writer.writerow(["Status", "Posisi", "Perusahaan", "Platform", "Waktu", "Tautan Loker", "Catatan"])
 
         for status_key, label in status_labels.items():
             for item in hist.get(status_key, []):
+                u = item.get("url", "")
+                platform = "Lainnya"
+                u_lower = u.lower()
+                if "jobstreet" in u_lower:
+                    platform = "JobStreet"
+                elif "glints" in u_lower:
+                    platform = "Glints"
+                elif "dealls" in u_lower:
+                    platform = "Dealls"
+                elif "maganghub" in u_lower:
+                    platform = "MagangHub"
+                elif "linkedin" in u_lower:
+                    platform = "LinkedIn"
+                elif item.get("platform"):
+                    platform = item.get("platform")
+
                 writer.writerow([
                     label,
                     item.get("title", ""),
                     item.get("company", ""),
+                    platform,
                     item.get("timestamp", ""),
-                    item.get("url", ""),
+                    u,
                     item.get("notes", ""),
                 ])
 

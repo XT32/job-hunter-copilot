@@ -34,5 +34,11 @@ class TestCoverLetter(unittest.TestCase):
         self.assertIn("Junior DevOps", letter)
         self.assertIn("Budi Pratama", letter)
 
+    def test_generate_english_internship_cover_letter(self):
+        letter = generate_cover_letter("Data Intern", "Traveloka", self.profile, preset="english_internship")
+        self.assertIn("Dear Internship Coordinator at Traveloka", letter)
+        self.assertIn("Data Intern", letter)
+        self.assertIn("Budi Pratama", letter)
+
 if __name__ == "__main__":
     unittest.main()

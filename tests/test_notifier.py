@@ -3,7 +3,12 @@ from unittest.mock import patch, MagicMock
 import urllib.error
 import io
 
-from src.notifier import send_telegram_alert, test_telegram_connection
+from src.notifier import (
+    send_telegram_alert,
+    test_telegram_connection,
+    send_telegram_interview_alert,
+    send_telegram_job_alert,
+)
 
 class TestNotifier(unittest.TestCase):
     def test_send_alert_missing_credentials(self):
@@ -61,6 +66,51 @@ class TestNotifier(unittest.TestCase):
         res = test_telegram_connection(bot_token="invalid_token", chat_id="12345")
         self.assertFalse(res["success"])
         self.assertIn("tidak valid", res["message"])
+
+    @patch("urllib.request.urlopen")
+    def test_send_telegram_interview_alert(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        # Missing creds
+        self.assertFalse(send_telegram_interview_alert("Backend", "PT ABC", bot_token=""))
+
+        # Success
+        success = send_telegram_interview_alert(
+            title="Backend Engineer",
+            company="PT Inovasi",
+            datetime_str="2026-11-20 10:00",
+            location="Google Meet",
+            notes="Siapkan portofolio",
+            bot_token="tok123",
+            chat_id="chat123"
+        )
+        self.assertTrue(success)
+
+    @patch("urllib.request.urlopen")
+    def test_send_telegram_job_alert(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        # Missing creds
+        self.assertFalse(send_telegram_job_alert("Frontend", "PT XYZ", "https://xyz.com", bot_token=""))
+
+        # Success
+        success = send_telegram_job_alert(
+            title="Frontend Engineer",
+            company="PT Kreasi",
+            url="https://glints.com/job/456",
+            platform="Glints",
+            salary="Rp 9.000.000",
+            ats_score=85,
+            bot_token="tok123",
+            chat_id="chat123"
+        )
+        self.assertTrue(success)
 
 if __name__ == "__main__":
     unittest.main()
