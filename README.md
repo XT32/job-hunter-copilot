@@ -32,10 +32,12 @@ Bagi kamu yang **tidak paham Git** atau **tidak punya Git di komputer**:
 - **MagangHub Kemnaker** (Program Pemagangan Nasional resmi Kementerian Ketenagakerjaan RI).
 - **Dealls Jobs Indonesia** (Pilihan posisi full-time, part-time & internship terkemuka).
 
-### 2. Detektor Lowongan Zonk & Tahan Ijazah (`src/scam_detector.py`)
+### 2. Detektor Lowongan Zonk & Modus Penipuan (`src/scam_detector.py`)
 Menganalisis teks lowongan secara heuristik lokal untuk melindungi pencari kerja dari modus penipuan:
 - ⚠️ Deteksi **klausul tahan ijazah asli** & denda penalti tidak wajar.
 - ⚠️ Deteksi **permintaan pungutan uang** (biaya formulir, uang seragam, tes kesehatan/psikotes berbayar, agen tiket travel).
+- ⚠️ Deteksi **penipuan kirim undangan via file APK WhatsApp** (`.apk`, *unduh surat panggilan.apk*).
+- ⚠️ Deteksi **modus tugas pesanan e-commerce / deposit saldo berbayar**.
 - ⚠️ Deteksi **perusahaan pialang berjangka / futures / forex** terselubung.
 - ⚠️ Deteksi modus interview fiktif di titik rawan (ruko Senen, Harmoni, dll).
 
@@ -55,9 +57,10 @@ Mendeteksi dan mengisi otomatis kuesioner umum saat pop-up lamaran muncul:
 - Pengalaman kerja (tahun).
 - Kota domisili & kesediaan WFO.
 
-### 6. Generator Cover Letter Instan (`src/cover_letter.py`)
+### 6. Generator Cover Letter Instan Bahasa Indonesia & Inggris (`src/cover_letter.py`)
 Menghasilkan surat lamaran kerja yang dipersonalisasi sesuai nama pelamar, nama perusahaan tujuan, dan posisi:
-- Pilihan gaya: **Formal Korporat**, **Fresh Graduate**, dan **Program Pemagangan**.
+- Pilihan gaya Bahasa Indonesia: **Formal Korporat**, **Fresh Graduate**, dan **Program Pemagangan**.
+- Pilihan gaya Bahasa Inggris: **Formal Corporate (English)** dan **Fresh Graduate / Entry Level (English)** untuk lowongan startup internasional & multinasional.
 
 ### 7. Papan Pelacak Status Lamaran & Mini Analytics (Kanban Pipeline)
 Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
@@ -73,8 +76,10 @@ Untuk lowongan yang meminta kirim email langsung ke HRD:
 - **✉️ Buka Mail App (Mailto):** Membuka aplikasi email bawaan sistem operasi.
 - **⚙️ Kirim via SMTP:** Opsi otomatis kirim via server SMTP (Gmail App Password) beserta lampiran file PDF CV.
 
-### 9. Notifikasi Telegram Bot Gratis (`src/notifier.py`)
+### 9. Notifikasi Telegram Bot Gratis & Tombol Tes Koneksi (`src/notifier.py`)
 Menerima pemberitahuan langsung di aplikasi Telegram pribadi saat bot menemukan lowongan yang cocok dengan jurusan/profil kamu.
+- Dilengkapi **Panduan Setup 1 Menit** di Dashboard (`@BotFather` & `@userinfobot`).
+- Tombol **`🧪 Tes Sambungan ke Telegram`** langsung di Dashboard Web untuk menguji token dan chat ID secara instan dengan pesan konfirmasi masuk ke ponsel kamu.
 
 ### 10. Cadangan Data (Backup & Restore)
 Unduh seluruh konfigurasi dan riwayat lamaran dalam format JSON dengan tombol **Backup** di pojok kanan atas dashboard.
