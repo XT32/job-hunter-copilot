@@ -49,6 +49,7 @@
         </button>
         <a href="/api/backup" class="btn btn-secondary btn-sm" title="Unduh cadangan data Anda">💾 Cadangkan Data</a>
         <button class="btn btn-secondary btn-sm" onclick="openRestoreBackupModal()" title="Pulihkan data dari berkas JSON">📥 Pulihkan Data</button>
+        <button class="btn btn-secondary btn-sm" onclick="openLegalModal()" title="Pemberitahuan Lisensi GNU AGPLv3, Hak Cipta, dan Sumber Terbuka">⚖️ AGPLv3</button>
       </div>
     </header>
 
@@ -539,6 +540,21 @@
         </div>
       </div>
     </div>
+
+    <!-- FOOTER LEGAL NOTICE & AGPL-3.0 COMPLIANCE -->
+    <footer style="margin-top: 35px; padding: 20px 0 10px 0; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--text-muted);">
+      <div>
+        <strong>Job Hunter Copilot</strong> &bull; Perangkat Lunak Bebas di bawah lisensi <a href="#" onclick="openLegalModal(); return false;" style="color: var(--primary); text-decoration: underline; font-weight: 600;">GNU AGPLv3</a>.
+        <div style="font-size: 0.73rem; opacity: 0.8; margin-top: 3px;">
+          Hak Cipta &copy; 2024-2026 XT32. Sesuai ketentuan AGPLv3 Seksi 13, kode sumber lengkap selalu dapat diakses secara bebas.
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="openLegalModal()" style="font-size:0.75rem; padding:4px 10px;">⚖️ Legal Notice &amp; Lisensi</button>
+        <a href="https://github.com/XT32/job-hunter-copilot" target="_blank" rel="noopener noreferrer" style="color: var(--primary); text-decoration: none; font-size: 0.78rem;">💻 Kode Sumber (GitHub)</a>
+        <a href="/api/legal/source" style="color: var(--success); text-decoration: none; font-size: 0.78rem;" title="Unduh arsip kode sumber lengkap (Seksi 13 AGPLv3)">📦 Unduh Source Code</a>
+      </div>
+    </footer>
   </div>
 
   <!-- MODAL UPDATE APLIKASI 1-KLIK -->
@@ -680,6 +696,63 @@
       <div id="qaQuestionsList" style="display:flex; flex-direction:column; gap:12px; margin-bottom:15px; max-height:300px; overflow-y:auto;"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button class="btn btn-secondary" onclick="closeQaModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL LEGAL NOTICE & LISENSI AGPLv3 -->
+  <div class="modal-overlay" id="legalNoticeModal">
+    <div class="modal" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
+      <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span>⚖️ Pemberitahuan Lisensi &amp; Legal Notice</span>
+        <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--primary); font-size: 0.75rem;">GNU AGPLv3</span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+        Pemberitahuan hukum resmi dan ketentuan hak cipta sesuai dengan <strong>GNU Affero General Public License v3</strong> Seksi 5(d) dan Seksi 13.
+      </p>
+
+      <!-- KOTAK HAK CIPTA & LISENSI -->
+      <div style="background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; font-size: 0.85rem;">
+        <div style="font-weight: 700; color: #fff; font-size: 0.95rem; margin-bottom: 4px;">Job Hunter Copilot</div>
+        <div style="color: var(--text-muted); margin-bottom: 8px;">Hak Cipta &copy; 2024-2026 <strong>XT32</strong>. Hak Cipta Dilindungi Undang-Undang.</div>
+        <div style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+          Perangkat lunak ini merupakan <em>Free &amp; Open Source Software</em> yang didistribusikan di bawah ketentuan lisensi <strong>GNU Affero General Public License versi 3 (AGPL-3.0)</strong> sebagaimana dipublikasikan oleh Free Software Foundation.
+        </div>
+      </div>
+
+      <!-- KETENTUAN SEKSI 13 JARINGAN (NETWORK COPYLEFT) -->
+      <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.82rem; color: #dcfce7; line-height: 1.45;">
+        <strong style="color: var(--success);">🌐 Ketentuan Jaringan (AGPLv3 Seksi 13):</strong><br>
+        Jika Anda menjalankan versi modifikasi dari program ini pada server jaringan, Anda diwajibkan secara hukum untuk menyediakan seluruh kode sumber versi modifikasi tersebut kepada pengguna jaringan tanpa biaya melalui sarana transfer perangkat lunak standar.
+      </div>
+
+      <!-- PENAFIAN GARANSI -->
+      <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.8rem; color: #fef3c7; line-height: 1.45;">
+        <strong style="color: var(--warning);">⚠️ Penafian Garansi (Disclaimer of Warranty - Seksi 15 &amp; 16):</strong><br>
+        Program ini didistribusikan dengan harapan dapat bermanfaat, namun <strong>TANPA JAMINAN APAPUN</strong>; bahkan tanpa jaminan tersirat atas <strong>KELAYAKAN UNTUK DIPERDAGANGKAN</strong> atau <strong>KESESUAIAN UNTUK TUJUAN TERTENTU</strong>. Pengguna bertanggung jawab penuh atas penggunaan dan interaksi otomasi terhadap layanan pihak ketiga.
+      </div>
+
+      <!-- KOMPATIBILITAS PIHAK KETIGA -->
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 0.85rem; font-weight: 700; color: #fff; margin-bottom: 6px;">📦 Kompatibilitas Pustaka Pihak Ketiga &amp; Aset:</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+          Seluruh dependensi eksternal telah diverifikasi kompatibel penuh dengan lisensi GNU AGPLv3:
+          <ul style="padding-left: 18px; margin-top: 4px;">
+            <li><strong>Flask</strong> (BSD-3-Clause) &bull; <strong>Playwright</strong> (Apache-2.0)</li>
+            <li><strong>pypdf</strong> (BSD-3-Clause) &bull; <strong>Rich</strong> (MIT) &bull; <strong>python-dotenv</strong> (BSD-3-Clause)</li>
+            <li><strong>Antarmuka Web (CSS/JS)</strong>: 100% orisinal lokal tanpa pustaka/CDN eksternal.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- AKSI & TAUTAN -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 12px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <a href="/api/legal/license" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.8rem;">📜 Teks LICENSE Penuh</a>
+          <a href="/api/legal/source" class="btn btn-success btn-sm" style="font-size: 0.8rem;">📦 Unduh Source Code (.zip)</a>
+          <a href="https://github.com/XT32/job-hunter-copilot" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="font-size: 0.8rem;">🌐 Repositori GitHub</a>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeLegalModal()">Tutup</button>
       </div>
     </div>
   </div>

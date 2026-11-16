@@ -1,3 +1,21 @@
+# Copyright (C) 2024-2026 XT32 <https://github.com/XT32/job-hunter-copilot>
+#
+# This file is part of Job Hunter Copilot.
+#
+# Job Hunter Copilot is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Job Hunter Copilot is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+import io
 import json
 import os
 import secrets
@@ -5,6 +23,7 @@ import sys
 import threading
 import time
 import webbrowser
+import zipfile
 from urllib.parse import urlparse
 from flask import Flask, render_template, request, jsonify, send_file, send_from_directory
 from werkzeug.utils import secure_filename
@@ -1210,6 +1229,128 @@ def api_update_restart():
 
     threading.Thread(target=_restart_later, daemon=True).start()
     return jsonify({"success": True, "message": "Aplikasi sedang dimuat ulang..."})
+
+
+# ================= LEGAL NOTICE & AGPL-3.0 SOURCE ACCESS =================
+@app.route("/api/legal", methods=["GET"])
+def api_get_legal_info():
+    """Mengembalikan informasi hak cipta, lisensi AGPLv3, dan daftar dependensi pihak ketiga."""
+    return jsonify({
+        "success": True,
+        "app_name": "Job Hunter Copilot",
+        "version": "1.0.0",
+        "copyright": "Copyright (C) 2024-2026 XT32. All rights reserved.",
+        "author": "XT32",
+        "license": "GNU Affero General Public License v3 (AGPL-3.0)",
+        "license_url": "/api/legal/license",
+        "source_repository": "https://github.com/XT32/job-hunter-copilot",
+        "source_archive_url": "https://github.com/XT32/job-hunter-copilot/archive/refs/heads/main.zip",
+        "source_download_url": "/api/legal/source",
+        "network_copyleft_notice": (
+            "Sesuai dengan ketentuan GNU AGPLv3 Seksi 13, seluruh pengguna yang berinteraksi dengan "
+            "perangkat lunak ini melalui jaringan komputer berhak mendapatkan salinan lengkap dari kode sumber "
+            "versi ini tanpa dipungut biaya melalui tautan unduh atau repositori resmi."
+        ),
+        "warranty_disclaimer": (
+            "This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; "
+            "without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. "
+            "See the GNU Affero General Public License for more details."
+        ),
+        "third_party_dependencies": [
+            {
+                "name": "Flask",
+                "license": "BSD-3-Clause",
+                "url": "https://palletsprojects.com/p/flask/",
+                "compatibility": "Kompatibel AGPLv3 (Lisensi permisif BSD)"
+            },
+            {
+                "name": "Playwright",
+                "license": "Apache-2.0",
+                "url": "https://playwright.dev/",
+                "compatibility": "Kompatibel AGPLv3 (Lisensi permisif Apache 2.0)"
+            },
+            {
+                "name": "pypdf",
+                "license": "BSD-3-Clause",
+                "url": "https://pypdf.readthedocs.io/",
+                "compatibility": "Kompatibel AGPLv3 (Lisensi permisif BSD)"
+            },
+            {
+                "name": "Rich",
+                "license": "MIT",
+                "url": "https://github.com/Textualize/rich",
+                "compatibility": "Kompatibel AGPLv3 (Lisensi permisif MIT)"
+            },
+            {
+                "name": "python-dotenv",
+                "license": "BSD-3-Clause",
+                "url": "https://github.com/theskumar/python-dotenv",
+                "compatibility": "Kompatibel AGPLv3 (Lisensi permisif BSD)"
+            },
+            {
+                "name": "cryptography (opsional)",
+                "license": "Apache-2.0 / BSD-3-Clause",
+                "url": "https://cryptography.io/",
+                "compatibility": "Kompatibel AGPLv3 (Dual license permisif)"
+            }
+        ]
+    })
+
+
+@app.route("/api/legal/license", methods=["GET"])
+def api_get_license():
+    """Mengembalikan teks lisensi lengkap GNU AGPLv3."""
+    license_path = os.path.join(os.path.dirname(__file__), "LICENSE")
+    if os.path.exists(license_path):
+        with open(license_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return content, 200, {"Content-Type": "text/plain; charset=utf-8"}
+    return "GNU Affero General Public License v3 (AGPL-3.0)\nhttps://www.gnu.org/licenses/agpl-3.0.txt", 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+@app.route("/api/legal/source", methods=["GET"])
+def api_download_source():
+    """
+    Menyediakan arsip kode sumber lengkap aplikasi sesuai ketentuan GNU AGPLv3 Seksi 13.
+    Mengecualikan data pribadi pengguna (.venv, data/, attachments/, log, dsb).
+    """
+    root_dir = os.path.dirname(__file__)
+    buf = io.BytesIO()
+
+    allowed_exts = {".py", ".html", ".js", ".css", ".md", ".txt", ".bat", ".sh", ".json", ".example"}
+    allowed_dirs = {"src", "templates", "static", "tests"}
+    include_files = {
+        "web_app.py", "requirements.txt", "README.md", "LICENSE", "CONTRIBUTING.md",
+        "start_windows.bat", "start_linux.sh", "start_web_windows.bat", "config.example.json"
+    }
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in include_files:
+            p = os.path.join(root_dir, f)
+            if os.path.isfile(p):
+                zf.write(p, arcname=f)
+
+        for d in allowed_dirs:
+            dp = os.path.join(root_dir, d)
+            if os.path.isdir(dp):
+                for dirpath, _, filenames in os.walk(dp):
+                    if "__pycache__" in dirpath:
+                        continue
+                    for fn in filenames:
+                        _, ext = os.path.splitext(fn)
+                        if ext.lower() in allowed_exts:
+                            fp = os.path.join(dirpath, fn)
+                            arcname = os.path.relpath(fp, root_dir)
+                            zf.write(fp, arcname=arcname)
+
+    buf.seek(0)
+    add_log("Arsip kode sumber lengkap AGPLv3 diunduh pengguna.", "info")
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="job-hunter-copilot-source.zip",
+    )
 
 
 def start_server(port=5000, auto_open=True):

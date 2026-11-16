@@ -1540,6 +1540,17 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       document.getElementById('updateModal').classList.remove('active');
     }
 
+    /* LEGAL NOTICE & AGPL-3.0 MODAL */
+    function openLegalModal() {
+      const modal = document.getElementById('legalNoticeModal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeLegalModal() {
+      const modal = document.getElementById('legalNoticeModal');
+      if (modal) modal.classList.remove('active');
+    }
+
     function dismissUpdateBanner() {
       const banner = document.getElementById('updateAvailableBanner');
       if (banner) banner.style.display = 'none';
