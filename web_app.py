@@ -799,6 +799,29 @@ def open_portal_login():
     return jsonify(res)
 
 
+@app.route("/api/browser/native-login", methods=["POST"])
+def api_browser_native_login():
+    """
+    Meluncurkan peramban resmi sistem (Google Chrome / Edge) untuk login bebas blokir
+    via 'Masuk dengan Google' atau media sosial, menggunakan direktori profil akun yang sama.
+    """
+    data = request.json or {}
+    platform = str(data.get("platform", "jobstreet")).lower().strip()
+    acc_id = data.get("account_id") or get_current_account_id()
+
+    url = data.get("url") or LOGIN_PORTAL_URLS.get(platform, "https://id.jobstreet.com/id")
+    from src.browser import launch_native_login_browser
+    res = launch_native_login_browser(url, account_id=acc_id)
+
+    if res.get("success"):
+        bname = res.get("browser_name", "Peramban")
+        add_log(f"Membuka {bname} resmi untuk login Google di {platform.upper()}. Sesi tersimpan aman.", "success")
+    else:
+        add_log(f"Gagal membuka peramban resmi: {res.get('error')}", "warning")
+
+    return jsonify(res)
+
+
 @app.route("/api/browser/close", methods=["POST"])
 def close_interactive_browser():
     closed = browser_session.close()
