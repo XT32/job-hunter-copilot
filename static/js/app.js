@@ -515,8 +515,9 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       } catch (e) {}
     }
 
-    async function openLoginBrowser() {
-      const platform = document.getElementById('platformSelect').value;
+    async function openLoginBrowser(platformOverride) {
+      const platformSelect = document.getElementById('platformSelect');
+      const platform = platformOverride || (platformSelect ? platformSelect.value : 'jobstreet');
       fetchLogs();
       try {
         const res = await fetch('/api/browser/login', {
@@ -536,6 +537,65 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
         alert('Gagal membuka jendela browser.');
       }
     }
+
+    function openLoginChoiceModal() {
+      const mainSel = document.getElementById('platformSelect');
+      const modalSel = document.getElementById('loginModalPlatformSelect');
+      if (mainSel && modalSel) {
+        modalSel.value = mainSel.value;
+      }
+      const modal = document.getElementById('loginChoiceModal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeLoginChoiceModal() {
+      const modal = document.getElementById('loginChoiceModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function openNativeGoogleLogin(platformOverride) {
+      const mainSel = document.getElementById('platformSelect');
+      const platform = platformOverride || (mainSel ? mainSel.value : 'jobstreet');
+      fetchLogs();
+      try {
+        const res = await fetch('/api/browser/native-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: platform })
+        });
+        const data = await res.json();
+        if (handleApiTamperResponse(data)) return;
+        if (data.success) {
+          alert(data.message || 'Browser resmi dibuka untuk login.');
+          fetchLogs();
+        } else {
+          alert('Gagal membuka browser resmi: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Gagal membuka browser resmi.');
+      }
+    }
+
+    function submitNativeLoginFromModal() {
+      const modalSel = document.getElementById('loginModalPlatformSelect');
+      const platform = modalSel ? modalSel.value : 'jobstreet';
+      closeLoginChoiceModal();
+      openNativeGoogleLogin(platform);
+    }
+
+    function submitStandardLoginFromModal() {
+      const modalSel = document.getElementById('loginModalPlatformSelect');
+      const platform = modalSel ? modalSel.value : 'jobstreet';
+      closeLoginChoiceModal();
+      openLoginBrowser(platform);
+    }
+
+    window.openLoginChoiceModal = openLoginChoiceModal;
+    window.closeLoginChoiceModal = closeLoginChoiceModal;
+    window.openNativeGoogleLogin = openNativeGoogleLogin;
+    window.submitNativeLoginFromModal = submitNativeLoginFromModal;
+    window.submitStandardLoginFromModal = submitStandardLoginFromModal;
+    window.openLoginBrowser = openLoginBrowser;
 
     async function openJobInCopilotBrowser(index) {
       const job = foundJobs[index];

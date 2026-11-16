@@ -143,9 +143,9 @@
           <div style="background:#0f172a; border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <div>
               <div style="font-size:0.8rem; font-weight:700; color:#fff;">3. Login Portal (Sekali Saja)</div>
-              <div style="font-size:0.75rem; color:var(--text-muted);">Agar sesi akun tersimpan</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">Mendukung Masuk dengan Google</div>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="openLoginBrowser()">🔑 Login</button>
+            <button class="btn btn-primary btn-sm" onclick="openLoginChoiceModal()">🔑 Login</button>
           </div>
         </div>
       </div>
@@ -177,7 +177,10 @@
             <label>Kata Kunci Posisi (Opsional)</label>
             <input type="text" id="scanKeywords" placeholder="Contoh: PPIC Staff (kosongkan = sesuai profil)">
           </div>
-          <button class="btn btn-secondary" onclick="openLoginBrowser()" title="Buka jendela untuk masuk ke akun portal Anda">🔑 Masuk Akun Portal</button>
+          <button class="btn btn-secondary" onclick="openLoginChoiceModal()" title="Pilih metode masuk akun portal Anda">🔑 Masuk Akun Portal</button>
+          <button class="btn btn-secondary" onclick="openNativeGoogleLogin()" title="Buka Google Chrome / Edge resmi untuk login via Google tanpa deteksi bot" style="border-color: rgba(56,189,248,0.4); background: rgba(56,189,248,0.08); font-weight: 600;">
+            <span>🌐 Login Google (Resmi)</span>
+          </button>
           <button class="btn btn-primary" id="btnScan" onclick="startScan()">
             <span id="scanBtnText">🔍 Mulai Cari Lowongan</span>
           </button>
@@ -886,6 +889,65 @@
       <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; border-top:1px solid var(--border); padding-top:14px;">
         <button class="btn btn-primary btn-sm" onclick="closeManageAccountsModal(); openCreateAccountModal();">➕ Tambah Akun Baru</button>
         <button class="btn btn-secondary btn-sm" onclick="closeManageAccountsModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PILIHAN LOGIN PORTAL KERJA (GOOGLE BYPASS) -->
+  <div class="modal-overlay" id="loginChoiceModal">
+    <div class="modal" style="max-width: 560px;">
+      <div class="card-title">🔑 Masuk Akun Portal Karir</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        Pilih portal dan metode login yang Anda inginkan. Sesi akun akan tersimpan aman di profil komputer ini.
+      </p>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label style="font-weight: 600;">Pilih Portal yang Ingin Dimasuki:</label>
+        <select id="loginModalPlatformSelect" style="width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: #f8fafc; font-size: 0.9rem;">
+          <option value="jobstreet">JobStreet SEEK Indonesia</option>
+          <option value="glints">Glints Indonesia</option>
+          <option value="dealls">Dealls Jobs Indonesia</option>
+          <option value="maganghub">MagangHub Kemnaker</option>
+        </select>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px;">
+        <!-- PILIHAN 1: NATIVE BROWSER (RECOMMENDED FOR GOOGLE) -->
+        <div style="border: 1px solid var(--primary); background: rgba(56, 189, 248, 0.08); border-radius: 10px; padding: 14px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 220px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; font-size: 0.95rem;">
+              <span>🌐</span>
+              <span>Buka Browser Resmi (Chrome / Edge)</span>
+              <span class="badge" style="background: var(--success); color: #0f172a; font-size: 0.68rem; font-weight: 800; padding: 1px 6px;">100% Anti-Blokir</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+              <strong>Sangat direkomendasikan jika Anda klik "Masuk dengan Google" atau akun media sosial.</strong> Membuka browser asli tanpa deteksi bot Playwright.
+            </p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="submitNativeLoginFromModal()" style="font-weight: 600; white-space: nowrap;">
+            🚀 Buka Browser Resmi
+          </button>
+        </div>
+
+        <!-- PILIHAN 2: INTERNAL COPILOT BROWSER -->
+        <div style="border: 1px solid var(--border); background: #0f172a; border-radius: 10px; padding: 14px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 220px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; font-size: 0.95rem;">
+              <span>🤖</span>
+              <span>Buka Jendela Bawaan Copilot</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+              Gunakan opsi ini jika Anda login dengan <strong>Email &amp; Kata Sandi</strong>, Link Magic Email, atau OTP WhatsApp / SMS.
+            </p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="submitStandardLoginFromModal()" style="white-space: nowrap;">
+            Buka Jendela Standar
+          </button>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeLoginChoiceModal()">Tutup</button>
       </div>
     </div>
   </div>

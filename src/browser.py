@@ -195,15 +195,130 @@ def get_browser_context(playwright_instance, headless=False, slow_mo=150, user_d
 
     context.add_init_script(
         """
+        // 1. Sembunyikan navigator.webdriver
         Object.defineProperty(navigator, 'webdriver', {
             get: () => undefined
         });
+
+        // 2. Emulasi antarmuka window.chrome lengkap
         window.chrome = {
-            runtime: {}
+            app: { isInstalled: false },
+            runtime: {},
+            loadTimes: function() {},
+            csi: function() {}
         };
+
+        // 3. Emulasi plugins dan bahasa browser agar tidak terbaca bot kosong
+        try {
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['id-ID', 'id', 'en-US', 'en']
+            });
+        } catch (e) {}
         """
     )
     return context
+
+
+def find_system_browser_executable() -> tuple[str, str]:
+    """
+    Menemukan executable browser resmi (Google Chrome / Edge / Brave / Chromium)
+    pada Linux, Windows, atau macOS.
+    Returns: (executable_path, browser_name)
+    """
+    candidates = [
+        ("google-chrome", "Google Chrome"),
+        ("google-chrome-stable", "Google Chrome"),
+        ("microsoft-edge", "Microsoft Edge"),
+        ("microsoft-edge-stable", "Microsoft Edge"),
+        ("brave-browser", "Brave Browser"),
+        ("chromium", "Chromium"),
+        ("chromium-browser", "Chromium"),
+        ("chrome", "Google Chrome"),
+        ("msedge", "Microsoft Edge"),
+    ]
+    for binary, name in candidates:
+        p = shutil.which(binary)
+        if p and os.path.isfile(p):
+            return p, name
+
+    if os.name == "nt":
+        prog_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        prog_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+        local_app_data = os.environ.get("LOCALAPPDATA", "")
+
+        windows_paths = [
+            (os.path.join(prog_files, "Google", "Chrome", "Application", "chrome.exe"), "Google Chrome"),
+            (os.path.join(prog_files_x86, "Google", "Chrome", "Application", "chrome.exe"), "Google Chrome"),
+            (os.path.join(local_app_data, "Google", "Chrome", "Application", "chrome.exe"), "Google Chrome"),
+            (os.path.join(prog_files, "Microsoft", "Edge", "Application", "msedge.exe"), "Microsoft Edge"),
+            (os.path.join(prog_files_x86, "Microsoft", "Edge", "Application", "msedge.exe"), "Microsoft Edge"),
+            (os.path.join(prog_files, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"), "Brave Browser"),
+        ]
+        for p, name in windows_paths:
+            if os.path.isfile(p):
+                return p, name
+
+    mac_paths = [
+        ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "Google Chrome"),
+        ("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "Microsoft Edge"),
+        ("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser", "Brave Browser"),
+        ("/Applications/Chromium.app/Contents/MacOS/Chromium", "Chromium"),
+    ]
+    for p, name in mac_paths:
+        if os.path.isfile(p):
+            return p, name
+
+    return "", ""
+
+
+def launch_native_login_browser(target_url: str, account_id: str = "default") -> dict:
+    """
+    Meluncurkan browser resmi sistem (Google Chrome / Edge) sebagai proses murni OS (non-Playwright),
+    menggunakan direktori profil data Copilot yang terisolasi.
+    Hal ini memungkinkan pengguna melakukan 'Sign in with Google' secara 100% normal
+    tanpa pernah diblokir atau dideteksi sebagai bot automasi oleh Google Accounts.
+    """
+    browser_exe, browser_name = find_system_browser_executable()
+    if not browser_exe:
+        return {
+            "success": False,
+            "error": "Tidak ditemukan Google Chrome atau Microsoft Edge resmi di sistem. Silakan pasang Google Chrome atau gunakan login email/password."
+        }
+
+    user_data_dir = get_user_data_dir(account_id)
+    os.makedirs(user_data_dir, exist_ok=True)
+    _cleanup_stale_singleton_locks(user_data_dir)
+
+    cmd = [
+        browser_exe,
+        f"--user-data-dir={user_data_dir}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        target_url,
+    ]
+
+    try:
+        import subprocess
+        if os.name == "nt":
+            creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            subprocess.Popen(cmd, creationflags=creationflags)
+        else:
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+        return {
+            "success": True,
+            "browser_name": browser_name,
+            "url": target_url,
+            "message": f"Browser {browser_name} resmi berhasil dibuka. Silakan lakukan 'Masuk dengan Google' di halaman tersebut, lalu tutup browser setelah selesai."
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Gagal meluncurkan {browser_name}: {str(e)}"
+        }
 
 
 def human_delay(min_sec=2, max_sec=4):

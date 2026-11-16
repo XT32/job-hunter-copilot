@@ -184,6 +184,11 @@ Menganalisis teks lowongan secara heuristik lokal sebelum pengguna memutuskan me
 * **Pulihkan 1-Klik:** Unggah kembali berkas cadangan saat berganti komputer atau install ulang tanpa kehilangan data riwayat atau konfigurasi.
 * **Format Portabel Transparan:** Berkas cadangan diekspor dalam format JSON terbuka agar mudah diarsipkan pengguna secara mandiri.
 
+### 12. 🌐 Handoff Browser Resmi untuk Login Google (100% Anti-Blokir Google OAuth)
+* **Bebas Blokir "Browser Tidak Aman":** Pengguna awam yang menggunakan fitur *"Masuk dengan Google"* (Google OAuth) atau media sosial sering kali ditolak oleh Google Accounts jika dibuka lewat peramban otomasi Chromium Playwright.
+* **Peluncuran Browser Asli OS:** Tombol `🌐 Login Google (Resmi)` akan mendeteksi dan meluncurkan Google Chrome atau Microsoft Edge asli yang terpasang di sistem operasi Anda secara langsung tanpa protokol otomasi (non-CDP/WebDriver).
+* **Penyimpanan Sesi Akun Otomatis:** Sesi login, kuki, dan token portal disimpan ke profil terisolasi komputer lokal (`user_browser_data/profiles/{account_id}`). Setelah login selesai dan browser resmi ditutup, Copilot dapat langsung membaca sesi tersebut untuk pencarian lowongan dan auto-apply tanpa perlu login ulang.
+
 ---
 
 ## 📥 Cara Pakai Cepat (1-Klik Tanpa Git)
@@ -311,7 +316,7 @@ job-hunter-copilot/
 │   └── js/app.js            # Logika antarmuka Web UI, filter, & integrasi API
 ├── templates/
 │   └── index.html           # Tampilan visual dashboard Web (Tab 1 - Tab 5)
-├── tests/                   # 25 berkas unit test lengkap (121 pengujian)
+├── tests/                   # 26 berkas unit test lengkap (130 pengujian)
 ├── start_windows.bat        # Skrip peluncur cepat 1-klik untuk Windows
 ├── start_linux.sh           # Skrip peluncur cepat 1-klik untuk Linux/macOS
 ├── web_app.py               # Server aplikasi Web Dashboard Flask
@@ -322,7 +327,7 @@ job-hunter-copilot/
 
 ## 🧪 Rangkaian Pengujian Otomatis
 
-Repositori ini dilengkapi rangkaian **121 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, background scheduler, hingga kepatuhan legal notice & unduh source code AGPLv3):
+Repositori ini dilengkapi rangkaian **130 unit tests mandiri** yang mencakup seluruh lapisan sistem (penguraian PDF, pencocokan kata kunci, deteksi indikasi risiko scam, keamanan HMAC database & enkripsi AES, origin CSRF, integrasi email, kalender, background scheduler, native browser Google OAuth handoff, hingga kepatuhan legal notice & unduh source code AGPLv3):
 
 ```bash
 python3 -m unittest discover tests -v
