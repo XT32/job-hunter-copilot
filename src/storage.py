@@ -84,6 +84,11 @@ def delete_job(job_url, source="ui") -> bool:
     return _get_db().delete_job(job_url, source=source)
 
 
+def clear_jobs_by_status(status="rejected", source="ui") -> int:
+    """Menghapus seluruh entri lamaran dengan status tertentu."""
+    return _get_db().clear_jobs_by_status(status, source=source)
+
+
 def verify_database_integrity() -> dict:
     """Mengembalikan status keamanan & deteksi tamper database lokal."""
     db = _get_db()

@@ -657,6 +657,29 @@ class LocalSecureDB:
             self._write_seal_and_snapshot(key, conn)
             return True
 
+    def clear_jobs_by_status(self, status: str, source: str = "ui") -> int:
+        """Menghapus seluruh entri lamaran dengan status tertentu (misal: membersihkan yang 'rejected')."""
+        valid_statuses = ["applied", "interview", "offering", "rejected", "skipped"]
+        if status not in valid_statuses:
+            return 0
+        with _db_lock:
+            self._assert_write_allowed(source)
+            key = self._get_or_create_key()
+            conn = self._connect()
+            count = conn.execute("SELECT COUNT(*) FROM job_history WHERE status=?", (status,)).fetchone()[0]
+            if count == 0:
+                conn.close()
+                return 0
+
+            conn.execute("DELETE FROM job_history WHERE status=?", (status,))
+            now = time.strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute(
+                "INSERT INTO security_audit (event_time, event_type, detail) VALUES (?, 'UI_JOBS_CLEAR_STATUS', ?)",
+                (now, f"Sebanyak {count} lamaran dengan status '{status}' dibersihkan via {source}."),
+            )
+            self._write_seal_and_snapshot(key, conn)
+            return count
+
     def _read_snapshot(self) -> dict:
         if not os.path.exists(self.snapshot_path):
             return None

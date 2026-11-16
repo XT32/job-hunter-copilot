@@ -8,6 +8,12 @@ from src.screener import ScreeningAutoFiller
 from src.cover_letter import generate_cover_letter
 
 
+BADGE_TAGS = {
+    "baru", "new", "mudah dilamar", "diperbarui", "urgent", "hot", "aktif merekrut",
+    "lamar cepat", "sponsored", "terverifikasi", "promoted", "featured", "populer"
+}
+
+
 class GlintsHunter(BaseJobHunter):
     def __init__(self, page, config):
         super().__init__(page, config)
@@ -67,8 +73,9 @@ class GlintsHunter(BaseJobHunter):
                         continue
 
                     card_text = card.inner_text().split("\n")
-                    title = card_text[0].strip() if len(card_text) > 0 else "Posisi tidak diketahui"
-                    company = card_text[1].strip() if len(card_text) > 1 else "Perusahaan tidak diketahui"
+                    clean_lines = [line.strip() for line in card_text if line.strip() and line.strip().lower() not in BADGE_TAGS]
+                    title = clean_lines[0] if len(clean_lines) > 0 else "Posisi tidak diketahui"
+                    company = clean_lines[1] if len(clean_lines) > 1 else "Perusahaan tidak diketahui"
 
                     salary = "Tidak dicantumkan"
                     location = ""

@@ -82,5 +82,16 @@ class TestStorage(unittest.TestCase):
         hist_after = storage.load_history()
         self.assertEqual(len(hist_after["applied"]), 0)
 
+    def test_clear_jobs_by_status(self):
+        storage.record_job("https://id.jobstreet.com/job/r1", "Job 1", "PT 1", status="rejected")
+        storage.record_job("https://id.jobstreet.com/job/r2", "Job 2", "PT 2", status="rejected")
+        storage.record_job("https://id.jobstreet.com/job/a1", "Job 3", "PT 3", status="applied")
+
+        cleared = storage.clear_jobs_by_status("rejected")
+        self.assertEqual(cleared, 2)
+        hist = storage.load_history()
+        self.assertEqual(len(hist["rejected"]), 0)
+        self.assertEqual(len(hist["applied"]), 1)
+
 if __name__ == "__main__":
     unittest.main()

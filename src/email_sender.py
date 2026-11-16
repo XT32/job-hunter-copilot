@@ -30,9 +30,15 @@ def send_cold_email(to_email, subject, body, attachment_path=None, smtp_config=N
             return {"success": False, "message": f"Gagal melampirkan file: {e}"}
 
     try:
-        with smtplib.SMTP_SSL(server_host, server_port) as server:
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
+        if server_port == 465:
+            with smtplib.SMTP_SSL(server_host, server_port, timeout=15) as server:
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(server_host, server_port, timeout=15) as server:
+                server.starttls()
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
         return {"success": True, "message": f"Email lamaran berhasil dikirim ke {to_email}"}
     except Exception as e:
         return {"success": False, "message": f"Gagal mengirim email: {str(e)}"}

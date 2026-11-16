@@ -141,6 +141,43 @@ class TestWebSecurityAndEndpoints(unittest.TestCase):
         self.assertEqual(resp_del.status_code, 200)
         self.assertTrue(resp_del.get_json().get("success"))
 
+    def test_clear_rejected_endpoint(self):
+        resp = self.client.post(
+            "/api/job/clear-rejected",
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json().get("success"))
+
+    def test_backup_restore_endpoint(self):
+        backup_payload = {
+            "config": {
+                "profile": {"field_or_major": "Teknik Informatika"}
+            },
+            "history": {
+                "applied": [
+                    {"url": "https://dealls.com/jobs/dev-1", "title": "Dev Python", "company": "Tech Corp", "notes": "Backup"}
+                ]
+            }
+        }
+        resp = self.client.post(
+            "/api/backup/restore",
+            json=backup_payload,
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertTrue(data.get("config_restored"))
+        self.assertGreaterEqual(data.get("jobs_restored", 0), 1)
+
+        # Cleanup
+        self.client.post(
+            "/api/job/delete",
+            json={"url": "https://dealls.com/jobs/dev-1"},
+            headers={"X-CSRF-Token": SERVER_CSRF_TOKEN},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

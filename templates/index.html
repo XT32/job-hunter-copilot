@@ -48,6 +48,7 @@
           <span id="btnHeaderUpdateText">🔄 Cek Update</span>
         </button>
         <a href="/api/backup" class="btn btn-secondary btn-sm" title="Unduh cadangan data Anda">💾 Cadangkan Data</a>
+        <button class="btn btn-secondary btn-sm" onclick="openRestoreBackupModal()" title="Pulihkan data dari berkas JSON">📥 Pulihkan Data</button>
       </div>
     </header>
 
@@ -273,9 +274,12 @@
         </div>
 
         <div class="kanban-col">
-          <div class="kanban-header" style="color: var(--danger);">
-            <span>❌ Ditolak / Gugur</span>
-            <span id="countRejected">0</span>
+          <div class="kanban-header" style="color: var(--danger); display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span>❌ Ditolak / Gugur</span>
+              <span id="countRejected">0</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="font-size:0.65rem; padding:1px 6px; opacity:0.85;" title="Hapus semua riwayat yang ditolak" onclick="clearRejectedKanban()">Bersihkan</button>
           </div>
           <div class="kanban-items" id="colRejected"></div>
         </div>
@@ -577,6 +581,25 @@
       <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="closeInterviewModal()">Batal</button>
         <button class="btn btn-success" onclick="saveInterviewSchedule()">💾 Simpan & Catat ke Interview</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PULIHKAN CADANGAN DATA (RESTORE) -->
+  <div class="modal-overlay" id="restoreBackupModal">
+    <div class="modal">
+      <div class="card-title">📥 Pulihkan Cadangan Data (Restore JSON)</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        Pilih berkas cadangan <code>backup_loker_cli.json</code> yang pernah Anda unduh sebelumnya. Profil, kata kunci, pengaturan, dan riwayat lamaran Anda akan dipulihkan secara otomatis.
+      </p>
+      <div class="form-group">
+        <label>Pilih Berkas Cadangan (.json)</label>
+        <input type="file" id="backupFileInput" accept=".json">
+      </div>
+      <div id="restoreStatusBox" style="display:none; font-size:0.85rem; margin-bottom:12px;"></div>
+      <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="closeRestoreBackupModal()">Batal</button>
+        <button class="btn btn-primary" id="btnSubmitRestore" onclick="submitRestoreBackup()">📥 Mulai Pulihkan Data</button>
       </div>
     </div>
   </div>

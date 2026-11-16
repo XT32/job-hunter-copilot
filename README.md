@@ -70,21 +70,23 @@ Melacak perkembangan lamaran pekerjaan dalam 4 tahapan:
 - ❌ **Ditolak / Gugur**
 - 🔍 **Pencarian Real-Time:** Filter kartu lowongan berdasarkan posisi, perusahaan, atau catatan secara instan tanpa batasan kuota tampilan.
 - ✏️ **Edit Catatan & 🗑️ Hapus:** Perbarui info link interview/nomor HR atau hapus lamaran uji coba langsung dari papan Kanban.
+- 🧹 **Bersihkan Massal:** Tombol 1-klik untuk membersihkan seluruh riwayat lamaran yang ditolak agar papan Kanban tetap rapi.
 - 📥 **Ekspor CSV/Excel & Kalender (.ics):** Unduh jadwal interview langsung ke Google/Outlook/Apple Calendar atau ekspor CSV dengan 1 klik.
 
 ### 8. Kirim Lamaran Email (1-Click Gmail Draft / Mailto / SMTP)
 Untuk lowongan yang meminta kirim email langsung ke HRD:
 - **🌐 Buka di Gmail Web (1-Klik):** Langsung membuka tab draf Gmail di browser dengan Subjek dan Isi Surat terisi rapi tanpa perlu konfigurasi kata sandi aplikasi.
 - **✉️ Buka Mail App (Mailto):** Membuka aplikasi email bawaan sistem operasi.
-- **⚙️ Kirim via SMTP:** Opsi otomatis kirim via server SMTP (Gmail App Password) beserta lampiran file PDF CV.
+- **⚙️ Kirim via SMTP:** Opsi otomatis kirim via server SMTP (mendukung Port 465 SSL dan Port 587 TLS/STARTTLS) beserta lampiran file PDF CV.
 
 ### 9. Notifikasi Telegram Bot Gratis & Tombol Tes Koneksi (`src/notifier.py`)
 Menerima pemberitahuan langsung di aplikasi Telegram pribadi saat bot menemukan lowongan yang cocok dengan jurusan/profil kamu.
 - Dilengkapi **Panduan Setup 1 Menit** di Dashboard (`@BotFather` & `@userinfobot`).
 - Tombol **`🧪 Tes Sambungan ke Telegram`** langsung di Dashboard Web untuk menguji token dan chat ID secara instan dengan pesan konfirmasi masuk ke ponsel kamu.
 
-### 10. Cadangan Data (Backup & Restore)
-Unduh seluruh konfigurasi dan riwayat lamaran dalam format JSON dengan tombol **Backup** di pojok kanan atas dashboard.
+### 10. Cadangan Data & Pemulihan Penuh (Backup & Restore JSON)
+- **💾 Cadangkan Data:** Unduh seluruh konfigurasi profil, pengaturan screening, dan riwayat lamaran dalam format JSON dengan 1 klik.
+- **📥 Pulihkan Data:** Unggah kembali berkas cadangan JSON saat berganti perangkat atau menginstal ulang tanpa kehilangan riwayat atau CV.
 
 ---
 

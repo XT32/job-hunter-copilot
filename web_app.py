@@ -21,6 +21,7 @@ from src.storage import (
     update_job_status,
     update_job_notes,
     delete_job,
+    clear_jobs_by_status,
     export_history_to_csv,
     get_analytics_summary,
     verify_database_integrity,
@@ -814,6 +815,14 @@ def api_delete_job():
     return jsonify({"success": success})
 
 
+@app.route("/api/job/clear-rejected", methods=["POST"])
+def api_clear_rejected():
+    count = clear_jobs_by_status("rejected", source="ui")
+    if count > 0:
+        add_log(f"Berhasil membersihkan {count} lamaran dengan status 'Ditolak'.", "info")
+    return jsonify({"success": True, "count": count})
+
+
 @app.route("/api/cover-letter", methods=["POST"])
 def get_cover_letter():
     data = request.json or {}
@@ -906,6 +915,67 @@ def download_backup():
         json.dump(backup_data, f, indent=2, ensure_ascii=False)
     add_log("Cadangan data JSON diunduh pengguna.", "info")
     return send_file(backup_path, mimetype="application/json", as_attachment=True, download_name="backup_loker_cli.json")
+
+
+@app.route("/api/backup/restore", methods=["POST"])
+def restore_backup():
+    """Memulihkan konfigurasi dan riwayat lamaran dari berkas cadangan JSON."""
+    data = None
+    if "backup_file" in request.files:
+        f = request.files["backup_file"]
+        if not f.filename or not f.filename.lower().endswith(".json"):
+            return jsonify({"success": False, "error": "Berkas cadangan harus berformat JSON (.json)"}), 400
+        try:
+            data = json.load(f.stream)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Berkas JSON tidak dapat dibaca: {str(e)}"}), 400
+    elif request.is_json:
+        data = request.json
+    else:
+        return jsonify({"success": False, "error": "Tidak ada berkas atau data cadangan yang dikirim."}), 400
+
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Format berkas cadangan tidak valid."}), 400
+
+    imported_cfg = False
+    imported_jobs = 0
+
+    # 1. Pulihkan Config jika tersedia
+    if "config" in data and isinstance(data["config"], dict):
+        cfg = load_config()
+        for k in ["profile", "screening_defaults", "smtp", "telegram", "active_cv", "min_delay_sec", "max_delay_sec", "auto_skip_already_seen", "browser_headless"]:
+            if k in data["config"]:
+                if isinstance(data["config"][k], dict) and isinstance(cfg.get(k), dict):
+                    cfg[k].update(data["config"][k])
+                else:
+                    cfg[k] = data["config"][k]
+        save_config(cfg, source="ui")
+        imported_cfg = True
+
+    # 2. Pulihkan History jika tersedia
+    if "history" in data and isinstance(data["history"], dict):
+        for status, items in data["history"].items():
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, dict) and item.get("url"):
+                    record_job(
+                        job_url=item["url"],
+                        title=item.get("title", "Posisi"),
+                        company=item.get("company", "Perusahaan"),
+                        status=status,
+                        notes=item.get("notes", ""),
+                        source="ui",
+                    )
+                    imported_jobs += 1
+
+    add_log(f"Cadangan berhasil dipulihkan ({imported_jobs} riwayat lamaran diimpor).", "success")
+    return jsonify({
+        "success": True,
+        "message": f"Cadangan berhasil dipulihkan! ({imported_jobs} riwayat lamaran diimpor)",
+        "config_restored": imported_cfg,
+        "jobs_restored": imported_jobs,
+    })
 
 
 # ================= RATE LIMITS & QUOTA =================

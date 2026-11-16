@@ -1025,6 +1025,94 @@ const CSRF_TOKEN = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf
       }
     }
 
+    async function clearRejectedKanban() {
+      const rejectedCount = (kanbanHistory.rejected || []).length;
+      if (rejectedCount === 0) {
+        alert('Tidak ada riwayat lamaran yang ditolak saat ini.');
+        return;
+      }
+      if (!confirm(`Hapus seluruh ${rejectedCount} riwayat lamaran yang ditolak?`)) return;
+
+      try {
+        const res = await fetch('/api/job/clear-rejected', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadKanban();
+          loadAnalytics();
+          fetchLogs();
+        } else {
+          alert('Gagal membersihkan: ' + (data.error || 'Terjadi kesalahan'));
+        }
+      } catch (e) {
+        alert('Terjadi kendala koneksi.');
+      }
+    }
+
+    /* RESTORE BACKUP MODAL LOGIC */
+    function openRestoreBackupModal() {
+      const box = document.getElementById('restoreStatusBox');
+      if (box) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+      }
+      const fileInput = document.getElementById('backupFileInput');
+      if (fileInput) fileInput.value = '';
+      document.getElementById('restoreBackupModal').classList.add('active');
+    }
+
+    function closeRestoreBackupModal() {
+      document.getElementById('restoreBackupModal').classList.remove('active');
+    }
+
+    async function submitRestoreBackup() {
+      const fileInput = document.getElementById('backupFileInput');
+      const box = document.getElementById('restoreStatusBox');
+      const btn = document.getElementById('btnSubmitRestore');
+
+      if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Silakan pilih berkas cadangan JSON terlebih dahulu.');
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append('backup_file', file);
+
+      btn.disabled = true;
+      btn.innerText = '⏳ Memulihkan...';
+      box.style.display = 'block';
+      box.innerHTML = '<span style="color:var(--primary);">Sedang memproses dan memvalidasi data cadangan...</span>';
+
+      try {
+        const res = await fetch('/api/backup/restore', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          box.innerHTML = `<span style="color:var(--success); font-weight:600;">[✓] ${escapeHtml(data.message)}</span>`;
+          loadConfig();
+          loadCVList();
+          loadKanban();
+          loadAnalytics();
+          fetchLogs();
+          setTimeout(() => {
+            closeRestoreBackupModal();
+          }, 1800);
+        } else {
+          box.innerHTML = `<span style="color:var(--danger); font-weight:600;">[x] ${escapeHtml(data.error || 'Gagal memulihkan')}</span>`;
+        }
+      } catch (e) {
+        box.innerHTML = `<span style="color:var(--danger);">[x] Kendala koneksi: ${escapeHtml(e.message)}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '📥 Mulai Pulihkan Data';
+      }
+    }
+
     async function moveKanban(encUrl, newStatus, encTitle = '', encCompany = '', encNotes = '') {
       const url = decodeURIComponent(encUrl);
       if (newStatus === 'interview') {
