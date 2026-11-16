@@ -74,6 +74,10 @@
         <a href="/api/backup" class="btn btn-secondary btn-sm" title="Unduh cadangan data Anda">💾 Cadangkan Data</a>
         <button class="btn btn-secondary btn-sm" onclick="openRestoreBackupModal()" title="Pulihkan data dari berkas JSON">📥 Pulihkan Data</button>
         <button class="btn btn-secondary btn-sm" onclick="openLegalModal()" title="Pemberitahuan Lisensi GNU AGPLv3, Hak Cipta, dan Sumber Terbuka">⚖️ AGPLv3</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmShutdownApp()" title="Matikan server Job Hunter Copilot dan hentikan proses" style="background:rgba(239,68,68,0.18); color:#fca5a5; border-color:rgba(239,68,68,0.45); font-weight:700; display:flex; align-items:center; gap:6px;">
+          <span>⏻</span>
+          <span>Matikan Copilot</span>
+        </button>
       </div>
     </header>
 
@@ -540,6 +544,22 @@
             Mode Senyap (Headless — cari lowongan di latar belakang tanpa membuka jendela peramban)
           </label>
         </div>
+        <div class="form-group" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);">
+          <label style="font-weight: 600; margin-bottom: 6px; display: block;">⏱️ Manajemen Daya: Otomatis Matikan Saat Tab Ditutup / Menganggur (Idle)</label>
+          <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <select id="cfgAutoShutdownMinutes" style="max-width:260px; padding:7px 10px; background:#0f172a; border:1px solid var(--border); border-radius:6px; color:#f8fafc;">
+              <option value="1">1 Menit (Paling Cepat)</option>
+              <option value="3">3 Menit</option>
+              <option value="5" selected>5 Menit (Standar)</option>
+              <option value="15">15 Menit</option>
+              <option value="30">30 Menit</option>
+              <option value="0">Nonaktifkan (Jangan Pernah Mati Otomatis)</option>
+            </select>
+            <span style="font-size:0.8rem; color:var(--text-muted);">
+              Laptop hemat baterai & memori. Jika semua tab peramban ditutup atau tidak ada aktivitas, aplikasi otomatis mati secara aman.
+            </span>
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -585,6 +605,16 @@
           <button class="btn btn-secondary btn-sm" onclick="restoreDatabaseSnapshot()">Pulihkan Salinan Terakhir</button>
         </div>
       </div>
+
+      <div class="card" style="border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.03);">
+        <div class="card-title" style="color: #f87171;">5. Kontrol Daya &amp; Keluar Aplikasi</div>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+          Selesai mencari lowongan? Anda dapat mematikan server lokal dan seluruh proses Copilot secara aman di sini tanpa perlu membuka Terminal.
+        </p>
+        <button class="btn btn-danger btn-sm" onclick="confirmShutdownApp()" style="background:#ef4444; color:#fff; border-color:#dc2626; font-weight:700; padding:8px 18px;">
+          ⏻ Matikan Job Hunter Copilot Sekarang
+        </button>
+      </div>
     </div>
 
     <!-- FOOTER LEGAL NOTICE & AGPL-3.0 COMPLIANCE -->
@@ -596,6 +626,7 @@
         </div>
       </div>
       <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <button class="btn btn-danger btn-sm" onclick="confirmShutdownApp()" style="font-size:0.75rem; padding:4px 10px; background:rgba(239,68,68,0.15); color:#fca5a5; border-color:rgba(239,68,68,0.4); font-weight:600;">⏻ Matikan Copilot</button>
         <button class="btn btn-secondary btn-sm" onclick="openLegalModal()" style="font-size:0.75rem; padding:4px 10px;">⚖️ Legal Notice &amp; Lisensi</button>
         <a href="https://github.com/XT32/job-hunter-copilot" target="_blank" rel="noopener noreferrer" style="color: var(--primary); text-decoration: none; font-size: 0.78rem;">💻 Kode Sumber (GitHub)</a>
         <a href="/api/legal/source" style="color: var(--success); text-decoration: none; font-size: 0.78rem;" title="Unduh arsip kode sumber lengkap (Seksi 13 AGPLv3)">📦 Unduh Source Code</a>
@@ -856,6 +887,39 @@
         <button class="btn btn-primary btn-sm" onclick="closeManageAccountsModal(); openCreateAccountModal();">➕ Tambah Akun Baru</button>
         <button class="btn btn-secondary btn-sm" onclick="closeManageAccountsModal()">Tutup</button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL KONFIRMASI MATIKAN APLIKASI -->
+  <div class="modal-overlay" id="shutdownModal">
+    <div class="modal" style="max-width: 480px; text-align: center;">
+      <div style="font-size: 3rem; margin-bottom: 8px;">⏻</div>
+      <div class="card-title" style="color: #f87171; justify-content: center; font-size:1.2rem;">Matikan Job Hunter Copilot?</div>
+      <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5;">
+        Server lokal dan seluruh proses browser akan dihentikan secara aman. Seluruh data lamaran, profil, dan konfigurasi Anda tetap tersimpan utuh di database lokal.
+      </p>
+      <div style="display: flex; justify-content: center; gap: 12px;">
+        <button class="btn btn-secondary" onclick="closeShutdownModal()">Batal</button>
+        <button class="btn btn-danger" id="btnConfirmShutdown" onclick="executeShutdownApp()" style="background:#ef4444; color:#fff; border-color:#dc2626; font-weight:700;">
+          ⏻ Ya, Matikan Sekarang
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAY LAYAR SETELAH APLIKASI MATI -->
+  <div id="shutdownOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.97); z-index:999999; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px;">
+    <div style="width:72px; height:72px; border-radius:50%; background:rgba(34,197,94,0.15); display:flex; align-items:center; justify-content:center; font-size:2.5rem; margin-bottom:18px;">
+      👋
+    </div>
+    <h2 style="color:#f8fafc; margin-bottom:10px; font-weight:700;">Job Hunter Copilot Telah Dimatikan</h2>
+    <p style="color:#94a3b8; max-width:460px; font-size:0.95rem; line-height:1.6; margin-bottom:24px;">
+      Server lokal dan seluruh proses latar belakang telah dinonaktifkan.<br>
+      Semua riwayat lamaran dan profil Anda tersimpan aman di komputer ini.<br><br>
+      <strong style="color:#38bdf8; font-size:1rem;">Anda dapat menutup tab atau jendela peramban ini sekarang.</strong>
+    </p>
+    <div style="font-size:0.82rem; color:#64748b; background:#1e293b; padding:10px 18px; border-radius:8px; border:1px solid #334155;">
+      💡 Untuk membuka kembali aplikasi nanti, jalankan <code>./start_linux.sh</code> atau <code>start_windows.bat</code>.
     </div>
   </div>
 

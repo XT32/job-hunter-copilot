@@ -121,8 +121,18 @@ def csrf_and_origin_protect():
             except Exception:
                 return jsonify({"success": False, "error": "Origin header tidak valid."}), 403
 
-        # 2. Periksa header X-CSRF-Token
+        # 2. Periksa header X-CSRF-Token (atau body/query untuk beacon unload)
         token = request.headers.get("X-CSRF-Token")
+        if not token:
+            try:
+                data = request.get_json(silent=True)
+                if isinstance(data, dict):
+                    token = data.get("csrf_token")
+            except Exception:
+                pass
+            if not token:
+                token = request.args.get("csrf_token")
+
         if not token or not secrets.compare_digest(token, SERVER_CSRF_TOKEN):
             return jsonify({"success": False, "error": "Token keamanan CSRF tidak valid atau sesi kadaluarsa."}), 403
 
@@ -1524,6 +1534,188 @@ def api_download_source():
     )
 
 
+# ================= SYSTEM LIFECYCLE & AUTO-SHUTDOWN WATCHDOG =================
+_app_start_time = time.time()
+_last_client_heartbeat = time.time()
+_connected_tabs = {}  # {tab_id: last_seen_timestamp}
+_shutdown_lock = threading.Lock()
+_is_shutting_down = False
+_watchdog_started = False
+STARTUP_GRACE_PERIOD_SECONDS = 90
+
+
+def record_heartbeat(tab_id: str) -> dict:
+    global _last_client_heartbeat
+    now = time.time()
+    _last_client_heartbeat = now
+    if tab_id:
+        _connected_tabs[str(tab_id)] = now
+    # Bersihkan tab yang tidak pernah update lebih dari 60 detik
+    stale_cutoff = now - 60
+    for tid in list(_connected_tabs.keys()):
+        if _connected_tabs[tid] < stale_cutoff:
+            _connected_tabs.pop(tid, None)
+    return {"success": True, "active_tabs": len(_connected_tabs)}
+
+
+def record_tab_disconnect(tab_id: str) -> dict:
+    if tab_id:
+        _connected_tabs.pop(str(tab_id), None)
+    return {"success": True, "active_tabs": len(_connected_tabs)}
+
+
+def get_system_lifecycle_status() -> dict:
+    now = time.time()
+    try:
+        cfg = load_config()
+        idle_minutes = int(cfg.get("auto_shutdown_idle_minutes", 5))
+    except Exception:
+        idle_minutes = 5
+
+    return {
+        "uptime_seconds": int(now - _app_start_time),
+        "active_tabs_count": len(_connected_tabs),
+        "seconds_since_last_heartbeat": int(now - _last_client_heartbeat),
+        "auto_shutdown_idle_minutes": idle_minutes,
+        "is_shutting_down": _is_shutting_down,
+    }
+
+
+def should_trigger_auto_shutdown(now: float = None) -> bool:
+    if _is_shutting_down:
+        return False
+    if now is None:
+        now = time.time()
+
+    # Masa toleransi awal setelah server dijalankan
+    if (now - _app_start_time) < STARTUP_GRACE_PERIOD_SECONDS:
+        return False
+
+    try:
+        cfg = load_config()
+        idle_minutes = int(cfg.get("auto_shutdown_idle_minutes", 5))
+    except Exception:
+        idle_minutes = 5
+
+    # 0 berarti dinonaktifkan oleh pengguna
+    if idle_minutes <= 0:
+        return False
+
+    # Jangan matikan jika sesi browser interaktif masih dibuka pengguna
+    try:
+        if browser_session.is_active():
+            return False
+    except Exception:
+        pass
+
+    # Jangan matikan jika background scan scheduler sedang aktif memindai
+    try:
+        if scheduler.is_running() and scheduler.get_status().get("is_scanning"):
+            return False
+    except Exception:
+        pass
+
+    threshold_sec = idle_minutes * 60
+    seconds_idle = now - _last_client_heartbeat
+
+    # Kondisi 1: Tidak ada heartbeat sama sekali selama threshold
+    if seconds_idle >= threshold_sec:
+        return True
+
+    # Kondisi 2: Jika semua tab telah disconnect dan tidak ada tab baru yang reconnect selama grace period (60 detik)
+    if len(_connected_tabs) == 0 and (now - _app_start_time) > STARTUP_GRACE_PERIOD_SECONDS and seconds_idle >= 60:
+        return True
+
+    return False
+
+
+def execute_shutdown(reason="manual", delay_sec=0.8):
+    global _is_shutting_down
+    with _shutdown_lock:
+        if _is_shutting_down:
+            return
+        _is_shutting_down = True
+
+    try:
+        if browser_session.is_active():
+            browser_session.close()
+    except Exception:
+        pass
+
+    try:
+        if scheduler.is_running():
+            scheduler.stop()
+    except Exception:
+        pass
+
+    msg = "Aplikasi dimatikan secara manual oleh pengguna." if reason == "manual" else "Aplikasi otomatis dimatikan karena tab peramban ditutup / idle."
+    print(f"\n[*] [System Shutdown] {msg}")
+
+    def _exit_target():
+        time.sleep(delay_sec)
+        os._exit(0)
+
+    threading.Thread(target=_exit_target, daemon=True).start()
+
+
+def _idle_watchdog_worker():
+    while not _is_shutting_down:
+        time.sleep(5)
+        if should_trigger_auto_shutdown():
+            execute_shutdown(reason="auto_idle_timeout")
+            break
+
+
+def ensure_watchdog_started():
+    global _watchdog_started
+    if not _watchdog_started:
+        _watchdog_started = True
+        t = threading.Thread(target=_idle_watchdog_worker, daemon=True)
+        t.start()
+
+
+@app.route("/api/system/heartbeat", methods=["POST"])
+def api_system_heartbeat():
+    tab_id = ""
+    try:
+        data = request.get_json(silent=True)
+        if isinstance(data, dict):
+            tab_id = data.get("tab_id", "")
+    except Exception:
+        pass
+    return jsonify(record_heartbeat(tab_id))
+
+
+@app.route("/api/system/client-disconnect", methods=["POST"])
+def api_system_client_disconnect():
+    tab_id = ""
+    try:
+        data = request.get_json(silent=True)
+        if isinstance(data, dict):
+            tab_id = data.get("tab_id", "")
+    except Exception:
+        pass
+    return jsonify(record_tab_disconnect(tab_id))
+
+
+@app.route("/api/system/shutdown", methods=["POST"])
+def api_system_shutdown():
+    add_log("Perintah matikan aplikasi diterima. Server dan peramban sedang dihentikan...", "warning")
+    execute_shutdown(reason="manual", delay_sec=0.8)
+    return jsonify({
+        "success": True,
+        "message": "Job Hunter Copilot telah dimatikan secara aman. Anda dapat menutup tab peramban ini."
+    })
+
+
+@app.route("/api/system/status", methods=["GET"])
+def api_system_status():
+    return jsonify({
+        "success": True,
+        "lifecycle": get_system_lifecycle_status()
+    })
+
+
 def _find_available_port(host: str, starting_port: int, max_attempts: int = 10) -> int:
     import socket
     for p in range(starting_port, starting_port + max_attempts):
@@ -1544,6 +1736,9 @@ def start_server(port=5000, auto_open=True):
     port = _find_available_port(host, requested_port)
     if port != requested_port:
         print(f"[*] Port {requested_port} sedang digunakan. Menggunakan port alternatif: {port}")
+
+    # Inisialisasi background watchdog auto-shutdown (idle / tab closed)
+    ensure_watchdog_started()
 
     # Inisialisasi database lokal saat mulai
     try:
